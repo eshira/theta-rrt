@@ -34,9 +34,10 @@ def getneighbors(node):
 	for delta in itertools.product([-1,0,1],repeat=2):
 		if (delta!=(0,0)):
 			candidate = np.subtract(node,delta)
-			if(freespace(candidate) and valid(candidate)):
-				#valid free neighbor
-				listofneighbors.append(tuple(candidate))
+			if(valid(candidate)):
+				if(freespace(candidate)):
+					#valid free neighbor
+					listofneighbors.append(tuple(candidate))
 	return listofneighbors
 
 def reconstruct(node,pathmap):
@@ -48,6 +49,65 @@ def reconstruct(node,pathmap):
 		except:
 			break
 	return path[::-1]
+
+def lineofsight(node1,node2):
+	for px in bresenham(node1,node2):
+		if not freespace(px):
+			return False
+	return True
+
+def bresenham(node1,node2):
+	#Bresenham's https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm
+	x0,y0 = node1
+	x1,y1 = node2
+	if abs(y1 - y0) < abs(x1 - x0):
+		if x0 > x1:
+			return plotLineLow(x1, y1, x0, y0)
+		else:
+			return plotLineLow(x0, y0, x1, y1)
+	else:
+		if y0 > y1:
+			return plotLineHigh(x1, y1, x0, y0)
+		else:
+			return plotLineHigh(x0, y0, x1, y1) 
+
+def plotLineLow(x0,y0,x1,y1):
+	pixels = []
+	deltax = x1 - x0
+	deltay = y1 - y0
+	stepy = 1
+	if deltay < 0:
+		stepy = -1
+		deltay = -deltay
+	D = 2*deltay - deltax
+	y = y0
+	if (deltax < 0): print("?")
+	for x in range(x0,x1+1):
+		pixels.append((x,y))
+		if D>0:
+			y = y + stepy
+			D = D - 2*deltax
+		D = D + 2*deltay
+	return pixels
+
+def plotLineHigh(x0,y0,x1,y1):
+	pixels = []
+	deltax = x1 - x0
+	deltay = y1 - y0
+	stepx = 1
+	if deltax < 0:
+		stepx = -1
+		deltax = -deltax
+	D = 2*deltax - deltay
+	x = x0
+	if (deltay < 0): print("????")
+	for y in range(y0,y1+1):
+		pixels.append((x,y))
+		if D>0:
+			x = x + stepx
+			D = D - 2*deltay
+		D = D + 2*deltax
+	return pixels
 
 def astar(start,goal): # Pass in two tuples in the form (x,y)
 	
@@ -105,6 +165,7 @@ def astar(start,goal): # Pass in two tuples in the form (x,y)
 						# remove old copy won't be necessary because
 						# the lower priority copy will get taken off first and added to open set
 						openPQ.put((g+heuristic(neighbor,goal),neighbor))
+
 	return False
 
 img = Image.open('map1.png').convert('1')
@@ -112,15 +173,15 @@ imarray = np.array(img)
 
 imgplot = plt.imshow(img)
 
-path = astar((0,10),(51,98))
+path = astar((40,10),(85,99))
 
 if (path):
 	print("Found path")
 	xs = [item[0] for item in path]
 	ys = [item[1] for item in path]
-	c_ = xs[::1]
+	c_ = range(len(path))
 	plt.scatter(xs,ys, s=10,c=c_,cmap="winter")
 else:
 	print("Didn't find path")
-	
+
 plt.show()
