@@ -5,6 +5,7 @@ from PIL import Image
 from queue import PriorityQueue
 import math
 import itertools
+import random
 
 THETASTAR = True # can turn off or on
 
@@ -237,12 +238,56 @@ def astar(start,goal): # Pass in two tuples in the form (x,y)
 
 	return False
 
+def rrt(start,goal):
+	K=1000 # Number of vertices in the tree
+	deltaq = 5 # incremental distance
+	G = {} # graph
+	tol = 5
+	sol = None
+	G[start] = [] # add vertex
+
+	for k in range(1,K):
+		while (True):
+			qrand = rand_conf()
+			# If qrand fell on the tree or in obstacle
+			if (not freespace(qrand)) and (not qrand in G.keys()):
+				continue
+			keys = list(G.keys())
+			index = np.argmin([L2norm(item,qrand) for item in keys])
+			qnear = keys[index]
+			vector = np.array(list(np.subtract(qrand,qnear))) # points from qnear to qrand
+			if(np.linalg.norm(vector)>0.000001):
+				vector = deltaq*vector/np.linalg.norm(vector)
+			qnew = tuple(np.add(qnear,vector).astype(int)) # test; later would move qnew incremental deltaq in direction qrand
+			if (not valid(qnew)):
+				continue
+			if not lineofsight(qnew,qnear):
+				continue
+			else:
+				break
+		G[qnew] = [] # vertex
+		G[qnear].append(qnew) # add edge
+		if (L2norm(qnew,goal) < tol): #within tolerance
+			print('found goal!!!!')
+			sol = qnew
+			break
+		# bias towards goal
+		# add goal check
+	return sol,G
+
+def rand_conf():
+	randx = random.randint(1,imarray.shape[0]-1)
+	randy = random.randint(1,imarray.shape[1]-1)
+	return (randx,randy)
+
+
 img = Image.open('map2.png').convert('1')
 imarray = np.array(img)
 
 imgplot = plt.imshow(img)
 
-mainpath = astar((2,2),(298,298))
+#mainpath = astar((2,2),(298,298))
+mainpath = None
 
 if mainpath:
 	path=[]
@@ -259,5 +304,13 @@ if mainpath:
 		plt.scatter(xs,ys, s=10,c=c_,cmap="winter")
 else:
 	print("Didn't find path")
+
+solution,graph = rrt((2,2),(198,198))
+if solution:
+	plt.scatter(solution[0],solution[1],color='red')
+
+for key, value in graph.items():
+	for item in value:
+		plt.plot([key[0],item[0]], [key[1],item[1]], linewidth=1)
 
 plt.show()
