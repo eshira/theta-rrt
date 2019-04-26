@@ -240,9 +240,9 @@ def astar(start,goal): # Pass in two tuples in the form (x,y)
 
 def rrt(start,goal):
 	K=1000 # Number of vertices in the tree
-	deltaq = 5 # incremental distance
+	deltaq = 10 # incremental distance
 	G = {} # graph
-	tol = 5
+	tol = 10
 	sol = None
 	G[start] = [] # add vertex
 
@@ -258,21 +258,26 @@ def rrt(start,goal):
 			vector = np.array(list(np.subtract(qrand,qnear))) # points from qnear to qrand
 			if(np.linalg.norm(vector)>0.000001):
 				vector = deltaq*vector/np.linalg.norm(vector)
-			qnew = tuple(np.add(qnear,vector).astype(int)) # test; later would move qnew incremental deltaq in direction qrand
+			if np.linalg.norm(vector) > np.linalg.norm(np.array(list(np.subtract(qrand,qnear)))):
+				# just go to the qrand, otherwise overshoot
+				qnew = qrand
+			else:
+				qnew = tuple(np.add(qnear,vector).astype(int)) # test; later would move qnew incremental deltaq in direction qrand
 			if (not valid(qnew)):
 				continue
 			if not lineofsight(qnew,qnear):
 				continue
 			else:
 				break
-		G[qnew] = [] # vertex
+		if not (qnew in G.keys()):
+			G[qnew] = [] # vertex
 		G[qnear].append(qnew) # add edge
 		if (L2norm(qnew,goal) < tol): #within tolerance
 			print('found goal!!!!')
 			sol = qnew
 			break
 		# bias towards goal
-		# add goal check
+
 	return sol,G
 
 def rand_conf():
@@ -303,9 +308,10 @@ if mainpath:
 		c_ = range(len(path))
 		plt.scatter(xs,ys, s=10,c=c_,cmap="winter")
 else:
-	print("Didn't find path")
+	pass
+	#print("Didn't find path")
 
-solution,graph = rrt((2,2),(198,198))
+solution,graph = rrt((2,2),(242,245))
 if solution:
 	plt.scatter(solution[0],solution[1],color='red')
 
