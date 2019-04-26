@@ -6,6 +6,8 @@ from queue import PriorityQueue
 import math
 import itertools
 
+THETASTAR = True # can turn off or on
+
 def heuristic(node, goal):
 	# Wrapper for convenience, easy to swap out what to use here
 	return L2norm(node, goal)
@@ -110,7 +112,6 @@ def plotLineHigh(x0,y0,x1,y1):
 	return pixels
 
 def astar(start,goal): # Pass in two tuples in the form (x,y)
-	
 	if not valid(start) or not valid(goal):
 		print("Start or goal is not valid. Error.")
 		return False
@@ -126,9 +127,18 @@ def astar(start,goal): # Pass in two tuples in the form (x,y)
 	gScore = {} # cost from start to node structure
 
 	# Initialize with start node
-	openPQ.put((heuristic(start,goal),start)) #put the start into the open pq
-	openSet.add(start) #and into the open set
-	gScore[start]=0 # start to start costs 0
+	#openPQ.put((heuristic(start,goal),start)) #put the start into the open pq
+	#openSet.add(start) #and into the open set
+	#gScore[start]=0 # start to start costs 0
+
+	gScore[start]=0
+	initialnodes = getneighbors(start)
+	for n in initialnodes:
+		gScore[n] = L2norm(start,n)
+		cameFrom[n]=start
+		openSet.add(n)
+		openPQ.put((gScore[n]+heuristic(n,goal),n))
+	closedSet.add(start)
 
 	# loop until found goal or openPQ is emtpy
 	while not openPQ.empty():
@@ -151,6 +161,7 @@ def astar(start,goal): # Pass in two tuples in the form (x,y)
 		for neighbor in neighbors:
 			# If it isn't already in the closedSet (if it is, ignore it):
 			if neighbor not in closedSet:
+
 				g = gScore[current]+L2norm(neighbor,current)
 				if neighbor not in openSet:
 					gScore[neighbor] = g
@@ -160,20 +171,37 @@ def astar(start,goal): # Pass in two tuples in the form (x,y)
 
 				else: # neighbor is already in open set
 					if g < gScore[neighbor]: # We're doing better with this path; update entry in openPQ
-						gScore[neighbor]=g
+						gScore[neighbor] = g
 						cameFrom[neighbor] = current
 						# remove old copy won't be necessary because
 						# the lower priority copy will get taken off first and added to open set
 						openPQ.put((g+heuristic(neighbor,goal),neighbor))
 
+				if (THETASTAR):
+					# Theta star, any angle search modification
+					if lineofsight(cameFrom[current],neighbor):
+						# If the gScore for neighbor thru parent of current is better than gscore of neighbor otherwise
+						g = gScore[cameFrom[current]]+L2norm(cameFrom[current],neighbor)
+						if g < gScore[neighbor]:
+							cameFrom[neighbor] = cameFrom[current]
+							gScore[neighbor] = g
+							# remove old copy won't be necessary because
+							# the lower priority copy will get taken off first and added to open set
+							openPQ.put((g+heuristic(neighbor,goal),neighbor))
+
 	return False
 
-img = Image.open('map1.png').convert('1')
+img = Image.open('map2.png').convert('1')
 imarray = np.array(img)
 
 imgplot = plt.imshow(img)
 
-path = astar((40,10),(85,99))
+mainpath = astar((266,7),(4,280))
+path=[]
+
+for first, second in zip(mainpath,mainpath[1:]):
+	pathsegment = bresenham(first,second)
+	path = path+pathsegment
 
 if (path):
 	print("Found path")
