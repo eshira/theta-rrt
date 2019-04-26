@@ -30,6 +30,43 @@ def freespace(node):
 	else:
 		return False
 
+def getprunedneighbors(node,parent):
+	# Get only pruned neighbors of a node
+	pruned = []
+
+	# Compute and adjust magnitude of direction
+	direction = np.subtract(node,parent)
+	if (direction[0] !=0): np.sign(direction[0])
+	if (direction[1] !=0): np.sign(direction[1])
+
+	# Add the natural neighbor (in the direction of the step)
+	pruned.append(np.add(node,direction))
+	# If horizontal move, check above and below
+	if direction[1]==0:
+		for delta in [-1,1]:
+			check = np.add(node,(0,delta))
+			if not freespace(check):
+				pruned.append(np.add(check,direction))
+	# If vertical move, check left and right
+	if direction[0]==0:
+		for delta in [-1,1]:
+			check = np.add(node,(delta,0))
+			if not freespace(check):
+				pruned.append(np.add(check,direction))
+
+	# For a diagonal move, also add the other two natural neighbors
+	if (direction[0]!=0 and direction[1]!=0):
+		pruned.append((node[0]+direction[0],node[1]))
+		pruned.append((node[0],node[1]+direction[1]))
+	# Check flanking, add the one past the flaking
+	check = np.add(node,(direction[0],0))
+	if not freespace(check):
+		pruned.append(np.add(check,(direction[0],0)))
+	checl = np.add(node,(0,direction[1]))
+	if not freespace(check):
+		pruned.append(np.add(check,(0,direction[1])))
+	return [item for item in pruned if (valid(item) and freespace(item))]
+
 def getneighbors(node):
 	listofneighbors = []
 	# Get the neighbors of the node
@@ -191,24 +228,26 @@ def astar(start,goal): # Pass in two tuples in the form (x,y)
 
 	return False
 
-img = Image.open('map2.png').convert('1')
+img = Image.open('map1.png').convert('1')
 imarray = np.array(img)
 
 imgplot = plt.imshow(img)
 
-mainpath = astar((266,7),(4,280))
-path=[]
+mainpath = astar((5,7),(98,98))
 
-for first, second in zip(mainpath,mainpath[1:]):
-	pathsegment = bresenham(first,second)
-	path = path+pathsegment
+if mainpath:
+	path=[]
 
-if (path):
-	print("Found path")
-	xs = [item[0] for item in path]
-	ys = [item[1] for item in path]
-	c_ = range(len(path))
-	plt.scatter(xs,ys, s=10,c=c_,cmap="winter")
+	for first, second in zip(mainpath,mainpath[1:]):
+		pathsegment = bresenham(first,second)
+		path = path+pathsegment
+
+	if (path):
+		print("Found path")
+		xs = [item[0] for item in path]
+		ys = [item[1] for item in path]
+		c_ = range(len(path))
+		plt.scatter(xs,ys, s=10,c=c_,cmap="winter")
 else:
 	print("Didn't find path")
 
