@@ -186,11 +186,20 @@ def astar(start,goal): # Pass in two tuples in the form (x,y)
 			# Instead of properly updating priorities
 			continue
 
+		#Lazy theta*
+		if THETASTAR:
+			if not lineofsight(current, cameFrom[current]):
+				myneighbors = [item for item in getneighbors(current) if item in closedSet]
+				values = [gScore[item]+L2norm(item,current) for item in myneighbors]
+				cameFrom[current] = myneighbors[np.argmin(values)]
+				gScore[current] = values[np.argmin(values)]
+
 		openSet.remove(current)
 		closedSet.add(current)
 
 		# If you found the goal, nearly done
 		if (current==goal):
+			print("Expanded nodes:",len(closedSet))
 			return reconstruct(current,cameFrom)
 
 		# Get the neighbors, and for each:
@@ -216,7 +225,7 @@ def astar(start,goal): # Pass in two tuples in the form (x,y)
 
 				if (THETASTAR):
 					# Theta star, any angle search modification
-					if lineofsight(cameFrom[current],neighbor):
+					if True: #lineofsight(cameFrom[current],neighbor): # delay line of sight check, lazy theta*
 						# If the gScore for neighbor thru parent of current is better than gscore of neighbor otherwise
 						g = gScore[cameFrom[current]]+L2norm(cameFrom[current],neighbor)
 						if g < gScore[neighbor]:
@@ -228,12 +237,12 @@ def astar(start,goal): # Pass in two tuples in the form (x,y)
 
 	return False
 
-img = Image.open('map1.png').convert('1')
+img = Image.open('map2.png').convert('1')
 imarray = np.array(img)
 
 imgplot = plt.imshow(img)
 
-mainpath = astar((5,7),(98,98))
+mainpath = astar((2,2),(298,298))
 
 if mainpath:
 	path=[]
