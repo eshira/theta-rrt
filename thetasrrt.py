@@ -248,7 +248,7 @@ def rrt(start,goal):
 
 	for k in range(1,K):
 		while (True):
-			qrand = rand_conf()
+			qrand = rand_conf(goal)
 			# If qrand fell on the tree or in obstacle
 			if (not freespace(qrand)) and (not qrand in G.keys()):
 				continue
@@ -280,10 +280,14 @@ def rrt(start,goal):
 
 	return sol,G
 
-def rand_conf():
-	randx = random.randint(1,imarray.shape[0]-1)
-	randy = random.randint(1,imarray.shape[1]-1)
-	return (randx,randy)
+def rand_conf(mean):
+	randx,randy = np.random.normal(mean, [0.5*imarray.shape[0],0.5*imarray.shape[1]], 2)
+	clipped = np.array([randx,randy])
+	np.clip([randx,randy], [0,0], [imarray.shape[0]-1,imarray.shape[1]-1], out=clipped)
+	#randx = random.randint(1,imarray.shape[0]-1)
+	#randy = random.randint(1,imarray.shape[1]-1)
+	#print(clipped)
+	return (int(clipped[0]),int(clipped[1]))
 
 
 img = Image.open('map2.png').convert('1')
@@ -291,7 +295,7 @@ imarray = np.array(img)
 
 imgplot = plt.imshow(img)
 
-#mainpath = astar((2,2),(298,298))
+#mainpath = astar((280,0),(8,280))
 mainpath = None
 
 if mainpath:
@@ -311,7 +315,7 @@ else:
 	pass
 	#print("Didn't find path")
 
-solution,graph = rrt((2,2),(242,245))
+solution,graph = rrt((2,2),(287,60))
 if solution:
 	plt.scatter(solution[0],solution[1],color='red')
 
