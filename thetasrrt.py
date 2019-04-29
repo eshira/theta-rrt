@@ -6,8 +6,10 @@ from queue import PriorityQueue
 import math
 import itertools
 import random
+from scipy.spatial.transform import Rotation as R
 
 THETASTAR = True # can turn off or on
+bikelength = 20 # Specify the bike length
 
 def heuristic(node, goal):
 	# Wrapper for convenience, easy to swap out what to use here
@@ -294,12 +296,91 @@ def rand_conf(mean):
 	#print(clipped)
 	return (int(clipped[0]),int(clipped[1]))
 
+def draw_bicycle(x,y,theta,alpha):
+	# draw the bicycle with rear wheel midpoint at x,y
+	# and rear axle rotated about that point in global frame by theta
+	# and front wheel position alpha off the forward position
+	
+	bikeframe = [bikelength,0,0]
+	r = R.from_euler('z', theta, degrees=True)
+	bikeframe = r.apply(bikeframe)
+	plt.plot([x,bikeframe[0]+x],[y,bikeframe[1]+y], color='blue',linewidth=5) # plot body
+	plt.quiver(x,y,bikeframe[0]/2,bikeframe[1]/2,facecolor='red',edgecolor='black',linewidth=0.5,headwidth=2.5,zorder=10,angles='xy', scale_units='xy', scale=1)
+
+	bikewheel = [bikelength/2,0,0]
+	w = R.from_euler('z',alpha,degrees=True)
+	bikewheel = w.apply(bikewheel)
+	bikewheel = r.apply(bikewheel)
+	pivot = (bikeframe[0]+x,bikeframe[1]+y)
+
+	plt.quiver(pivot[0],pivot[1],bikewheel[0],bikewheel[1],facecolor='yellow',edgecolor='black',linewidth=0.5,headwidth=2.5,zorder=10,angles='xy', scale_units='xy', scale=1)
+	#plt.plot([bikeframe[0]+x,bikeframe[0]+x+bikewheel[0]],[bikeframe[1]+y,bikeframe[1]+y+bikewheel[1]], color='blue',linewidth=3)
+
+def draw_path(x,y,theta,alpha,arclength):
+	# starting at x,y,theta
+	# steering with alpha
+	# for arclength distance
+	plt.scatter(x,y,color='red',s=10)
+	#find the intersection
+	#two points: x,y and from there, length bikeframe in direction theta
+	#two vectors: theta and theta+alpha
+
+	bikeframe = [bikelength,0,0]
+	r = R.from_euler('z', theta, degrees=True)
+	bikeframe = r.apply(bikeframe)
+	
+	plt.plot([x,bikeframe[0]+x],[y,bikeframe[1]+y], color='blue',linewidth=5) # plot body
+	
+	bikewheel = [bikelength/2,0,0]
+	w = R.from_euler('z',alpha,degrees=True)
+	bikewheel = w.apply(bikewheel)
+	bikewheel = r.apply(bikewheel)
+	pivot = (bikeframe[0]+x,bikeframe[1]+y)
+	plt.quiver(pivot[0],pivot[1],bikewheel[0],bikewheel[1],facecolor='yellow',edgecolor='black',linewidth=0.5,headwidth=2.5,zorder=10,angles='xy', scale_units='xy', scale=1)
+
+	bikewheel = [bikelength/2,0,0]
+	w = R.from_euler('z',alpha+90,degrees=True)
+	bikewheel = w.apply(bikewheel)
+	bikewheel = r.apply(bikewheel)
+	pivot = (bikeframe[0]+x,bikeframe[1]+y)
+	plt.quiver(pivot[0],pivot[1],bikewheel[0],bikewheel[1],facecolor='cyan',edgecolor='black',linewidth=0.5,headwidth=2.5,zorder=10,angles='xy', scale_units='xy', scale=1)
+	print("Pivot", pivot)
+	r = R.from_euler('z', 90, degrees=True)
+	bikeframe = r.apply(bikeframe)
+	plt.quiver(x,y,bikeframe[0]/2,bikeframe[1]/2,facecolor='red',edgecolor='black',linewidth=0.5,headwidth=2.5,zorder=10,angles='xy', scale_units='xy', scale=1)
+
+	# red arrow: bikeframe vector, point is x,y
+	# cyan arrow: bikewheel, point is pivot
+	bikeorigin = np.array([x,y])
+
+	v1 = bikeframe[:2]
+	v2 = bikewheel[:2]
+
+	a1,b1,c1=linefrompoints(bikeorigin,np.add(v1,bikeorigin))
+	a2,b2,c2=linefrompoints(pivot,np.add(v2,pivot))
+
+	a = np.array([[a1,b1],[a2,b2]])
+	b = np.array([c1,c2])
+
+	intersection = np.linalg.solve(a,b)
+
+	print(intersection)
+	plt.plot([x,x+v1[0]],[y,y+v1[1]],color='lime',zorder=20)
+	#plt.plot([pivot[0],v1[0]],[pivot[1],v1[1]],color='green',zorder=20)
+	plt.plot([pivot[0],pivot[0]+v2[0]],[pivot[1],pivot[1]+v2[1]],color='cyan',zorder=20)
+	plt.scatter(intersection[0],intersection[1],s=50,color='red',zorder=50)
+
+def linefrompoints(p,q):
+	a = q[1]-p[1]
+	b = p[0]-q[0]
+	c = a*p[0]+b*p[1]
+	return a,b,c
 
 img = Image.open('map2.png').convert('1')
 imarray = np.array(img)
 
 imgplot = plt.imshow(img)
-
+plt.grid(True)
 #mainpath = astar((280,0),(8,280))
 mainpath = None
 
@@ -320,6 +401,7 @@ else:
 	pass
 	#print("Didn't find path")
 
+"""
 solution,graph,camefrom = rrt((2,2),(287,60))
 
 if solution:
@@ -329,13 +411,22 @@ for key, value in graph.items():
 	for item in value:
 		plt.plot([key[0],item[0]], [key[1],item[1]], linewidth=1)
 
-a = solution
-b = camefrom[a]
-while True:
-	if b is None:
-		break
-	plt.plot([a[0],b[0]], [a[1],b[1]], color='red',linewidth=1)
-	a = b # child
-	b = camefrom[b] # parent
+try:
+	a = solution
+	b = camefrom[a]
+	while True:
+		if b is None:
+			break
+		plt.plot([a[0],b[0]], [a[1],b[1]], color='red',linewidth=1)
+		a = b # child
+		b = camefrom[b] # parent
+except Exception as e:
+	print(e)
+	print(a)
+"""
+
+#draw_bicycle(25,25,45,45)
+#draw_bicycle(50,50,90,25)
+draw_path(10,15,120,45,0)
 
 plt.show()
