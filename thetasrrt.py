@@ -242,9 +242,12 @@ def rrt(start,goal):
 	K=1000 # Number of vertices in the tree
 	deltaq = 10 # incremental distance
 	G = {} # graph
-	tol = 10
+	tol = 5
 	sol = None
 	G[start] = [] # add vertex
+	cameFrom = {} # for extracting trajectory
+	cameFrom[start] = None
+
 
 	for k in range(1,K):
 		while (True):
@@ -272,13 +275,15 @@ def rrt(start,goal):
 		if not (qnew in G.keys()):
 			G[qnew] = [] # vertex
 		G[qnear].append(qnew) # add edge
+		if qnew != qnear:
+			cameFrom[qnew] = qnear
 		if (L2norm(qnew,goal) < tol): #within tolerance
 			print('found goal!!!!')
 			sol = qnew
 			break
 		# bias towards goal
 
-	return sol,G
+	return sol,G,cameFrom
 
 def rand_conf(mean):
 	randx,randy = np.random.normal(mean, [0.5*imarray.shape[0],0.5*imarray.shape[1]], 2)
@@ -315,12 +320,22 @@ else:
 	pass
 	#print("Didn't find path")
 
-solution,graph = rrt((2,2),(287,60))
+solution,graph,camefrom = rrt((2,2),(287,60))
+
 if solution:
 	plt.scatter(solution[0],solution[1],color='red')
 
 for key, value in graph.items():
 	for item in value:
 		plt.plot([key[0],item[0]], [key[1],item[1]], linewidth=1)
+
+a = solution
+b = camefrom[a]
+while True:
+	if b is None:
+		break
+	plt.plot([a[0],b[0]], [a[1],b[1]], color='red',linewidth=1)
+	a = b # child
+	b = camefrom[b] # parent
 
 plt.show()
