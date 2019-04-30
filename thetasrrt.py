@@ -298,13 +298,15 @@ def rand_conf(mean):
 	#print(clipped)
 	return (int(clipped[0]),int(clipped[1]))
 
-def draw_bicycle(x,y,theta,alpha):
+def draw_bicycle(bike_loc,theta,alpha):
 	# draw the bicycle
 	
 	# Draw the bike frame and direction theta
 	bikeframe = [bikelength,0,0]
 	r = R.from_euler('z', theta, degrees=True)
 	bikeframe = r.apply(bikeframe)
+	x = bike_loc[0]
+	y = bike_loc[1]
 	plt.plot([x,bikeframe[0]+x],[y,bikeframe[1]+y], color='blue',linewidth=5) # plot body
 	plt.quiver(x,y,bikeframe[0]/2,bikeframe[1]/2,facecolor='red',edgecolor='black',linewidth=0.5,headwidth=2.5,zorder=10,angles='xy', scale_units='xy', scale=1)
 
@@ -324,11 +326,12 @@ def draw_bicycle(x,y,theta,alpha):
 	pivot = (bikeframe[0]+x,bikeframe[1]+y)
 	plt.quiver(pivot[0],pivot[1],bikewheel[0],bikewheel[1],facecolor='cyan',edgecolor='black',linewidth=0.5,headwidth=2.5,zorder=10,angles='xy', scale_units='xy', scale=1)
 
-def draw_path(x,y,theta,alpha,arclength):
+def draw_path(bike_loc,theta,alpha,arclength):
 	# Draw a path taken by the bike
 
-	draw_bicycle(x,y,theta,alpha)
-
+	draw_bicycle(bike_loc,theta,alpha)
+	x = bike_loc[0]
+	y = bike_loc[1]
 	# Find pivot point of bike and vector of frame of bike
 	bikeframe = [bikelength,0,0]
 	r = R.from_euler('z', theta, degrees=True)
@@ -348,10 +351,10 @@ def draw_path(x,y,theta,alpha,arclength):
 
 	v1 = bikeframe[:2]
 	v2 = bikewheel[:2]
-	bikeorigin = np.array([x,y])
+	bikeorigin = np.array(bike_loc)
 	
 	try:	
-		#curve driving
+		#curved driving if the matrix is not nearly singular or singular
 		a1,b1,c1=linefrompoints(bikeorigin,np.add(v1,bikeorigin))
 		a2,b2,c2=linefrompoints(pivot,np.add(v2,pivot))
 
@@ -399,10 +402,6 @@ def draw_path(x,y,theta,alpha,arclength):
 		angle2 = np.rad2deg(np.arctan2(det2,dot2))
 		angle3 = np.rad2deg(np.arctan2(det3,dot3))
 
-
-		#angle = np.rad2deg(np.arctan2(greenline[0],greenline[1]))
-		#angle2 = np.rad2deg(np.arctan2(orangeline[0],orangeline[1]))
-
 		angle = angle
 		angle2= angle2
 		print(angle,angle2)
@@ -416,10 +415,10 @@ def draw_path(x,y,theta,alpha,arclength):
 		ax.add_patch(arc)
 
 		if alpha<0:
-			draw_bicycle(newbikeorigin[0],newbikeorigin[1],-90-angle,alpha)
+			draw_bicycle(newbikeorigin,-90-angle,alpha)
 		else:
-			draw_bicycle(newbikeorigin[0],newbikeorigin[1],90-angle,alpha)
-	
+			draw_bicycle(newbikeorigin,90-angle,alpha)
+
 	except Exception as e:
 		print(e)
 		# Straight line driving in direction of v1 or v2
@@ -427,6 +426,12 @@ def draw_path(x,y,theta,alpha,arclength):
 		newbikeorigin = np.add(vec[:2]*arclength,bikeorigin)
 		plt.plot([bikeorigin[0],newbikeorigin[0]],[bikeorigin[1],newbikeorigin[1]],color='magenta',linestyle='--')
 		draw_bicycle(newbikeorigin[0],newbikeorigin[1],theta,alpha)
+
+def steer():
+	#plt.plot([bikeorigin[0],newbikeorigin[0]],[bikeorigin[1],newbikeorigin[1]])
+	#bisector = (0.5*(bikeorigin[0]+newbikeorigin[0]),0.5*(bikeorigin[1]+newbikeorigin[1]))
+	#plt.plot([intersection[0],bisector[0]],[intersection[1],bisector[1]])
+	pass
 
 def arclength_to_angle(radius, arclength):
 	return arclength*360/(np.pi*2*radius)
@@ -496,6 +501,6 @@ except Exception as e:
 
 #draw_bicycle(25,25,45,45)
 #draw_bicycle(50,50,90,25)
-draw_path(100,150,170,30,stepsize)
+draw_path((100,150),170,30,stepsize)
 
 plt.show()
