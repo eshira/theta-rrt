@@ -252,10 +252,10 @@ def standardangle(angle):
 def rrt(start,goal):
 	start = (start[0],standardangle(start[1]))
 	goal = (goal[0],standardangle(goal[1]))
-	K=100 # Number of vertices in the tree
+	K=1000 # Number of vertices in the tree
 	deltaq = 10 # incremental distance
 	G = {} # graph
-	tol = 20
+	tol = 10
 	sol = None
 	G[start] = [] # add vertex
 	cameFrom = {} # for extracting trajectory
@@ -265,25 +265,39 @@ def rrt(start,goal):
 	for k in range(1,K):
 		qrand = (rand_conf(goal[0]))
 		qrand = (qrand[0],standardangle(qrand[1]))
-		# If qrand fell on the tree or in obstacle
-		if (not freespace(qrand[0])) and (not qrand in G.keys()):
+		
+		# If qrand falls on an obstacle or is in the set of keys
+		if (not freespace(qrand[0])):
+			print('notfreespace')
+			continue
+		if (qrand in G.keys()):
+			print("in keys")
 			continue
 		keys = list(G.keys())
 		index = np.argmin([L2norm(item[0],qrand[0]) for item in keys])
 		qnear = keys[index]
 		
-		angle = standardangle(steer(qnear[0], qnear[1], qrand[0], qrand[1]))
-		qnew = (qrand[0],angle)
-		"""
-		vector = np.array(list(np.subtract(qrand,qnear))) # points from qnear to qrand
-		if(np.linalg.norm(vector)>0.000001):
-			vector = deltaq*vector/np.linalg.norm(vector)
-		if np.linalg.norm(vector) > np.linalg.norm(np.array(list(np.subtract(qrand,qnear)))):
-			# just go to the qrand, otherwise overshoot
-			qnew = qrand
+		finalang,steerang = steer(qnear[0], qnear[1], qrand[0], qrand[1])
+		finalang = standardangle(finalang)
+		steerang = standardangle(steerang)
+
+		if steerang == 0: # straight line driving
+			vector = np.subtract(qrand[0],qnear[0]) # vector points from qnear to qrand
+			if(np.linalg.norm(vector)>0.000001): # try to normalize
+				vector = deltaq*vector/np.linalg.norm(vector)
+			else:
+				# too close. pick a new one
+				continue
+		
+			if np.linalg.norm(vector) > np.linalg.norm(np.array(list(np.subtract(qrand[0],qnear[0])))):
+				# just go to the qrand, otherwise overshoot
+				qnew = qrand
+			else:
+				print(vector)
+				qnew = (tuple(np.add(qnear[0],vector).astype(int)),qnear[1])
+				# test; later would move qnew incremental deltaq in direction qrand
 		else:
-			qnew = tuple(np.add(qnear,vector).astype(int)) # test; later would move qnew incremental deltaq in direction qrand
-		"""
+			qnew = (qrand[0],finalang)
 
 		if (not valid(qnew[0])):
 			continue
@@ -297,6 +311,7 @@ def rrt(start,goal):
 
 		if qnew != qnear:
 			cameFrom[qnew] = qnear
+
 		if (L2norm(qnew[0],goal[0]) < tol): #within tolerance
 			print('found goal!!!!')
 			sol = qnew
@@ -563,11 +578,11 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 
 		#circ = patches.Circle(intersection, radius=rad,fill=False,edgecolor='magenta',linestyle='--')
 		#ax.add_patch(circ)
-		return final
+		return final,steerangle
 
 	except Exception as e:
 		print(e)
-		return theta
+		return theta,0
 	#plt.plot([intersection[0],bisector[0]],[intersection[1],bisector[1]])
 	
 
@@ -639,7 +654,7 @@ try:
 		#draw_bicycle((a[0]),a[1],0)
 		#draw_bicycle((b[0]),b[1],0)
 		steer(a[0],a[1],b[0],b[1],plot=True)
-		plt.plot([a[0][0],b[0][0]], [a[0][1],b[0][1]], color='red',linewidth=1)
+		#plt.plot([a[0][0],b[0][0]], [a[0][1],b[0][1]], color='red',linewidth=1)
 		a = b # child
 		b = camefrom[b] # parent
 except Exception as e:
