@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+import matplotlib.patches as patches
 import numpy as np
 from PIL import Image
 from queue import PriorityQueue
@@ -10,6 +11,7 @@ from scipy.spatial.transform import Rotation as R
 
 THETASTAR = True # can turn off or on
 bikelength = 20 # Specify the bike length
+stepsize = 50 # specify arclength for steps
 
 def heuristic(node, goal):
 	# Wrapper for convenience, easy to swap out what to use here
@@ -297,78 +299,144 @@ def rand_conf(mean):
 	return (int(clipped[0]),int(clipped[1]))
 
 def draw_bicycle(x,y,theta,alpha):
-	# draw the bicycle with rear wheel midpoint at x,y
-	# and rear axle rotated about that point in global frame by theta
-	# and front wheel position alpha off the forward position
+	# draw the bicycle
 	
+	# Draw the bike frame and direction theta
 	bikeframe = [bikelength,0,0]
 	r = R.from_euler('z', theta, degrees=True)
 	bikeframe = r.apply(bikeframe)
 	plt.plot([x,bikeframe[0]+x],[y,bikeframe[1]+y], color='blue',linewidth=5) # plot body
 	plt.quiver(x,y,bikeframe[0]/2,bikeframe[1]/2,facecolor='red',edgecolor='black',linewidth=0.5,headwidth=2.5,zorder=10,angles='xy', scale_units='xy', scale=1)
 
-	bikewheel = [bikelength/2,0,0]
-	w = R.from_euler('z',alpha,degrees=True)
-	bikewheel = w.apply(bikewheel)
-	bikewheel = r.apply(bikewheel)
-	pivot = (bikeframe[0]+x,bikeframe[1]+y)
-
-	plt.quiver(pivot[0],pivot[1],bikewheel[0],bikewheel[1],facecolor='yellow',edgecolor='black',linewidth=0.5,headwidth=2.5,zorder=10,angles='xy', scale_units='xy', scale=1)
-	#plt.plot([bikeframe[0]+x,bikeframe[0]+x+bikewheel[0]],[bikeframe[1]+y,bikeframe[1]+y+bikewheel[1]], color='blue',linewidth=3)
-
-def draw_path(x,y,theta,alpha,arclength):
-	# starting at x,y,theta
-	# steering with alpha
-	# for arclength distance
-	plt.scatter(x,y,color='red',s=10)
-	#find the intersection
-	#two points: x,y and from there, length bikeframe in direction theta
-	#two vectors: theta and theta+alpha
-
-	bikeframe = [bikelength,0,0]
-	r = R.from_euler('z', theta, degrees=True)
-	bikeframe = r.apply(bikeframe)
-	
-	plt.plot([x,bikeframe[0]+x],[y,bikeframe[1]+y], color='blue',linewidth=5) # plot body
-	
+	# Draw the front wheel direction
 	bikewheel = [bikelength/2,0,0]
 	w = R.from_euler('z',alpha,degrees=True)
 	bikewheel = w.apply(bikewheel)
 	bikewheel = r.apply(bikewheel)
 	pivot = (bikeframe[0]+x,bikeframe[1]+y)
 	plt.quiver(pivot[0],pivot[1],bikewheel[0],bikewheel[1],facecolor='yellow',edgecolor='black',linewidth=0.5,headwidth=2.5,zorder=10,angles='xy', scale_units='xy', scale=1)
-
+	
+	# Draw an arrow 90 degrees to the front wheel
 	bikewheel = [bikelength/2,0,0]
 	w = R.from_euler('z',alpha+90,degrees=True)
 	bikewheel = w.apply(bikewheel)
 	bikewheel = r.apply(bikewheel)
 	pivot = (bikeframe[0]+x,bikeframe[1]+y)
 	plt.quiver(pivot[0],pivot[1],bikewheel[0],bikewheel[1],facecolor='cyan',edgecolor='black',linewidth=0.5,headwidth=2.5,zorder=10,angles='xy', scale_units='xy', scale=1)
-	print("Pivot", pivot)
-	r = R.from_euler('z', 90, degrees=True)
-	bikeframe = r.apply(bikeframe)
-	plt.quiver(x,y,bikeframe[0]/2,bikeframe[1]/2,facecolor='red',edgecolor='black',linewidth=0.5,headwidth=2.5,zorder=10,angles='xy', scale_units='xy', scale=1)
 
-	# red arrow: bikeframe vector, point is x,y
-	# cyan arrow: bikewheel, point is pivot
-	bikeorigin = np.array([x,y])
+def draw_path(x,y,theta,alpha,arclength):
+	# Draw a path taken by the bike
+
+	draw_bicycle(x,y,theta,alpha)
+
+	# Find pivot point of bike and vector of frame of bike
+	bikeframe = [bikelength,0,0]
+	r = R.from_euler('z', theta, degrees=True)
+	bikeframe = r.apply(bikeframe)
+	pivot = (bikeframe[0]+x,bikeframe[1]+y)
+	
+	# Find vector normal to the bike front wheel
+	bikewheel = [bikelength/2,0,0]
+	w = R.from_euler('z',alpha+90,degrees=True)
+	bikewheel = w.apply(bikewheel)
+	bikewheel = r.apply(bikewheel)
+
+	# Get vector normal to frame of bike
+	r = R.from_euler('z', 90, degrees=True)
+	other_bikeframe = bikeframe
+	bikeframe = r.apply(bikeframe)
 
 	v1 = bikeframe[:2]
 	v2 = bikewheel[:2]
+	bikeorigin = np.array([x,y])
+	
+	try:	
+		#curve driving
+		a1,b1,c1=linefrompoints(bikeorigin,np.add(v1,bikeorigin))
+		a2,b2,c2=linefrompoints(pivot,np.add(v2,pivot))
 
-	a1,b1,c1=linefrompoints(bikeorigin,np.add(v1,bikeorigin))
-	a2,b2,c2=linefrompoints(pivot,np.add(v2,pivot))
+		a = np.array([[a1,b1],[a2,b2]])
+		b = np.array([c1,c2])
 
-	a = np.array([[a1,b1],[a2,b2]])
-	b = np.array([c1,c2])
+		# solve for ICC
+		intersection = np.linalg.solve(a,b)
 
-	intersection = np.linalg.solve(a,b)
+		if np.linalg.cond(a) > 1000000:
+			#matrix is near singular
+			raise Exception("Nearly singular")
 
-	print(intersection)
-	plt.plot([x,x+v1[0]],[y,y+v1[1]],color='lime',zorder=20)
-	#plt.plot([pivot[0],v1[0]],[pivot[1],v1[1]],color='green',zorder=20)
-	plt.plot([pivot[0],pivot[0]+v2[0]],[pivot[1],pivot[1]+v2[1]],color='cyan',zorder=20)
-	plt.scatter(intersection[0],intersection[1],s=50,color='red',zorder=50)
+		plt.scatter(intersection[0],intersection[1],s=10,color='red',zorder=50)
+		plt.plot([bikeorigin[0],intersection[0]],[bikeorigin[1],intersection[1]],color='orangered')
+
+		rad = np.linalg.norm(np.subtract(bikeorigin,intersection))
+
+		r = R.from_euler('z',arclength_to_angle(rad,arclength),degrees=True)
+		if alpha<0:
+			r = R.from_euler('z',-arclength_to_angle(rad,arclength),degrees=True)
+		v = np.subtract(bikeorigin,intersection)
+		v = [v[0],v[1],0]
+		v = r.apply(v)
+
+		newbikeorigin = intersection[0]+v[0],intersection[1]+v[1]
+		plt.plot([intersection[0],newbikeorigin[0]],[intersection[1],newbikeorigin[1]],color='lime')
+		
+		greenline = np.subtract(newbikeorigin,intersection)
+		greenline = greenline/np.linalg.norm(greenline)
+
+		orangeline = np.subtract(bikeorigin,intersection)
+		orangeline = orangeline/np.linalg.norm(orangeline)
+		
+		dot = np.dot(np.array([1,0]),greenline)
+		det = greenline[0]*0-1*greenline[1]
+
+		dot2 = np.dot(np.array([1,0]),orangeline)
+		det2 = orangeline[0]*0-1*orangeline[1]
+
+		dot3 = np.dot(greenline,orangeline)
+		det3 = orangeline[0]*greenline[1]-greenline[0]*orangeline[1]
+
+		angle = np.rad2deg(np.arctan2(det,dot))
+		angle2 = np.rad2deg(np.arctan2(det2,dot2))
+		angle3 = np.rad2deg(np.arctan2(det3,dot3))
+
+
+		#angle = np.rad2deg(np.arctan2(greenline[0],greenline[1]))
+		#angle2 = np.rad2deg(np.arctan2(orangeline[0],orangeline[1]))
+
+		angle = angle
+		angle2= angle2
+		print(angle,angle2)
+
+		if alpha<0:
+			arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle, theta1=0, theta2=-angle3,edgecolor='magenta',linestyle='--')
+		else:
+			arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle2, theta1=0, theta2=angle3,edgecolor='magenta',linestyle='--')
+
+		
+		ax.add_patch(arc)
+
+		if alpha<0:
+			draw_bicycle(newbikeorigin[0],newbikeorigin[1],-90-angle,alpha)
+		else:
+			draw_bicycle(newbikeorigin[0],newbikeorigin[1],90-angle,alpha)
+	
+	except Exception as e:
+		print(e)
+		# Straight line driving in direction of v1 or v2
+		vec = other_bikeframe/np.linalg.norm(other_bikeframe)
+		newbikeorigin = np.add(vec[:2]*arclength,bikeorigin)
+		plt.plot([bikeorigin[0],newbikeorigin[0]],[bikeorigin[1],newbikeorigin[1]],color='magenta',linestyle='--')
+		draw_bicycle(newbikeorigin[0],newbikeorigin[1],theta,alpha)
+
+def arclength_to_angle(radius, arclength):
+	return arclength*360/(np.pi*2*radius)
+
+def fixangle(angle):
+	while angle < 0:
+		angle = angle+ 360
+	while angle > 360:
+		angle = angle -360
+	return angle
 
 def linefrompoints(p,q):
 	a = q[1]-p[1]
@@ -381,6 +449,7 @@ imarray = np.array(img)
 
 imgplot = plt.imshow(img)
 plt.grid(True)
+ax = plt.gca()
 #mainpath = astar((280,0),(8,280))
 mainpath = None
 
@@ -427,6 +496,6 @@ except Exception as e:
 
 #draw_bicycle(25,25,45,45)
 #draw_bicycle(50,50,90,25)
-draw_path(10,15,120,45,0)
+draw_path(100,150,170,30,stepsize)
 
 plt.show()
