@@ -244,9 +244,9 @@ def astar(start,goal): # Pass in two tuples in the form (x,y)
 
 def standardangle(angle):
 	while angle >180:
-		angle = angle-180
+		angle = angle-360
 	while angle <= -180:
-		angle = angle+180
+		angle = angle+360
 	return angle
 
 def rrt(start,goal):
@@ -328,16 +328,18 @@ def rand_conf(mean):
 	randtheta = np.random.uniform(0,2*np.pi)
 	return (int(clipped[0]),int(clipped[1])),np.rad2deg(randtheta)
 
-def draw_bicycle(bike_loc,theta,alpha):
+def draw_bicycle(bike_loc,theta,alpha,colorA=False):
 	# draw the bicycle
-	
+	drawcolor = 'blue'
+	if colorA:
+		drawcolor='lime'
 	# Draw the bike frame and direction theta
 	bikeframe = [bikelength,0,0]
 	r = R.from_euler('z', theta, degrees=True)
 	bikeframe = r.apply(bikeframe)
 	x = bike_loc[0]
 	y = bike_loc[1]
-	plt.plot([x,bikeframe[0]+x],[y,bikeframe[1]+y], color='blue',linewidth=5) # plot body
+	plt.plot([x,bikeframe[0]+x],[y,bikeframe[1]+y], color=drawcolor,linewidth=5) # plot body
 	plt.quiver(x,y,bikeframe[0]/2,bikeframe[1]/2,facecolor='red',edgecolor='black',linewidth=0.5,headwidth=2.5,zorder=10,angles='xy', scale_units='xy', scale=1)
 
 	# Draw the front wheel direction
@@ -518,10 +520,7 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 		det = steervector[0]*bikeframe[1]-bikeframe[0]*steervector[1]
 		steerangle = -np.rad2deg(np.arctan2(det,dot))
 
-		if steerangle<-90:
-			steerangle = steerangle+180
-		if steerangle >90:
-			steerangle = steerangle-180
+		steerangle = standardangle(steerangle)
 		
 		# trying to get another piece working
 		final = np.subtract(bikegoal,intersection)
@@ -537,13 +536,13 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 
 		if final<-90:
 			final = final+180
-		if final >90:
+		if final >=90:
 			final = final-180
 		#continue
 		
 		if plot:
-			draw_bicycle(bikeorigin,theta,steerangle)
-			draw_bicycle(bikegoal,final,0)
+			draw_bicycle(bikeorigin,theta,steerangle,colorA=True)
+			draw_bicycle(bikegoal,final,0,colorA=False)
 
 		greenline = np.subtract(bikegoal,intersection)
 		greenline = greenline/np.linalg.norm(greenline)
@@ -629,10 +628,10 @@ else:
 	pass
 	#print("Didn't find path")
 
-begin = ((20,20),-90)
-end = ((60,65),-90)
+begin = ((20,20),standardangle(-90))
+end = ((60,65),standardangle(-90))
 solution,graph,camefrom = rrt( begin , end )
-draw_bicycle(begin[0],begin[1],0)
+draw_bicycle(begin[0],begin[1],0,colorA=True)
 draw_bicycle(end[0],end[1],0)
 
 
@@ -661,9 +660,6 @@ except Exception as e:
 	print(e)
 	print(a)
 
-
-#draw_bicycle(25,25,45,45)
-#draw_bicycle(50,50,90,25)
 #draw_path((100,150),170,30,stepsize)
 #steer((0,0),80,(50,52),0)
 #steer((50,52),0,(80,100),90)
