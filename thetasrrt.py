@@ -12,6 +12,7 @@ from scipy.spatial.transform import Rotation as R
 THETASTAR = True # can turn off or on
 bikelength = 5 # Specify the bike length
 stepsize = 10 # specify arclength for steps
+tol = 10 # tolerance for goal xy
 
 def heuristic(node, goal):
 	# Wrapper for convenience, easy to swap out what to use here
@@ -243,6 +244,15 @@ def astar(start,goal): # Pass in two tuples in the form (x,y)
 	return False
 
 def standardangle(angle):
+	"""
+	r1 = R.from_euler('z', angle, degrees=True)
+	r2 = R.from_euler('z', 0, degrees=True)
+	diff = r1.inv()*r2
+	diff = diff.as_euler('xyz')[2]
+	diff = np.rad2deg(diff)
+	return diff
+	"""
+	
 	while angle >180:
 		angle = angle-360
 	while angle <= -180:
@@ -255,7 +265,6 @@ def rrt(start,goal):
 	K=1000 # Number of vertices in the tree
 	deltaq = 10 # incremental distance
 	G = {} # graph
-	tol = 10
 	sol = None
 	G[start] = [] # add vertex
 	cameFrom = {} # for extracting trajectory
@@ -293,7 +302,7 @@ def rrt(start,goal):
 				# just go to the qrand, otherwise overshoot
 				qnew = qrand
 			else:
-				print(vector)
+				#print(vector)
 				qnew = (tuple(np.add(qnear[0],vector).astype(int)),qnear[1])
 				# test; later would move qnew incremental deltaq in direction qrand
 		else:
@@ -312,7 +321,16 @@ def rrt(start,goal):
 		if qnew != qnear:
 			cameFrom[qnew] = qnear
 
-		if (L2norm(qnew[0],goal[0]) < tol): #within tolerance
+		#print(standardangle(qnew[1]))
+		#print(standardangle(goal[1]))
+		r1 = R.from_euler('z', qnew[1], degrees=True)
+		r2 = R.from_euler('z', goal[1], degrees=True)
+		diff = r1.inv()*r2
+		diff = diff.as_euler('xyz')[2]
+		diff = np.rad2deg(diff)
+		#print(diff)
+
+		if (L2norm(qnew[0],goal[0]) < tol) and (abs(diff)<90): #within tolerance
 			print('found goal!!!!')
 			sol = qnew
 			break
@@ -321,12 +339,15 @@ def rrt(start,goal):
 	return sol,G,cameFrom
 
 def rand_conf(mean):
-	randx,randy = np.random.normal(mean, [0.5*imarray.shape[0],0.5*imarray.shape[1]], 2)
-	clipped = np.array([randx,randy])
-	np.clip([randx,randy], [0,0], [imarray.shape[0]-1,imarray.shape[1]-1], out=clipped)
+	randx = random.randint(1,imarray.shape[0]-1)
+	randy = random.randint(1,imarray.shape[1]-1)
+	#randx,randy = np.random.normal(mean, [0.5*imarray.shape[0],0.5*imarray.shape[1]], 2)
+	#clipped = np.array([randx,randy])
+	#np.clip([randx,randy], [0,0], [imarray.shape[0]-1,imarray.shape[1]-1], out=clipped)
 	
 	randtheta = np.random.uniform(0,2*np.pi)
-	return (int(clipped[0]),int(clipped[1])),np.rad2deg(randtheta)
+	return ((randx,randy),np.rad2deg(randtheta))
+	#return (int(clipped[0]),int(clipped[1])),np.rad2deg(randtheta)
 
 def draw_bicycle(bike_loc,theta,alpha,colorA=False):
 	# draw the bicycle
@@ -434,9 +455,6 @@ def draw_path(bike_loc,theta,alpha,arclength):
 		angle2 = np.rad2deg(np.arctan2(det2,dot2))
 		angle3 = np.rad2deg(np.arctan2(det3,dot3))
 
-		angle = angle
-		angle2= angle2
-
 		if alpha<0:
 			arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle, theta1=0, theta2=-angle3,edgecolor='magenta',linestyle='--')
 		else:
@@ -527,17 +545,26 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 		final = [final[0],final[1],0]
 		r = R.from_euler('z', -90, degrees=True)
 		final = r.apply(final)
+		# tangent to the circle at the goal
+		# but pointing
 
 		final=final[:2]
 		testvec = [1,0]
 		dot = np.dot(testvec,final)
 		det = final[0]*testvec[1]-testvec[0]*final[1]
 		final = -np.rad2deg(np.arctan2(det,dot))
+		if (steerangle<0):
+			final = standardangle(final+180)		
+		else:
+			# fix bug
+			final = standardangle(final)
 
+		"""
 		if final<-90:
 			final = final+180
 		if final >=90:
 			final = final-180
+		"""
 		#continue
 		
 		if plot:
@@ -580,7 +607,7 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 		return final,steerangle
 
 	except Exception as e:
-		print(e)
+		#print(e)
 		return theta,0
 	#plt.plot([intersection[0],bisector[0]],[intersection[1],bisector[1]])
 	
@@ -653,6 +680,7 @@ try:
 		#draw_bicycle((a[0]),a[1],0)
 		#draw_bicycle((b[0]),b[1],0)
 		steer(a[0],a[1],b[0],b[1],plot=True)
+		print(a[1],b[1])
 		#plt.plot([a[0][0],b[0][0]], [a[0][1],b[0][1]], color='red',linewidth=1)
 		a = b # child
 		b = camefrom[b] # parent
