@@ -1,24 +1,26 @@
 import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
-import matplotlib.patches as patches
+import matplotlib.image as mpimg # for drawing images
+import matplotlib.patches as patches # for drawing arcs and circles
 import numpy as np
-from PIL import Image
-from queue import PriorityQueue
+from PIL import Image # for doing some stuff with images
+from queue import PriorityQueue # for A*/Theta*
 import math
-import itertools
+import itertools # for some neighbor expansion stuff
 import random
-from scipy.spatial.transform import Rotation as R
+from scipy.spatial.transform import Rotation as R # for consistently doing rotations
 
 THETASTAR = True # can turn off or on
-bikelength = 5 # Specify the bike length
+bikelength = 5 # Specify the bike frame length
 stepsize = 10 # specify arclength for steps
 tol = 10 # tolerance for goal xy
+tolang = 45
 
 def heuristic(node, goal):
 	# Wrapper for convenience, easy to swap out what to use here
 	return L2norm(node, goal)
 
 def L2norm(node0, node1):
+	# Dunno why I didn't just use numpy
 	return math.sqrt(pow((node1[0]-node0[0]),2)+pow((node1[1]-node0[1]),2))
 
 def valid(node):
@@ -31,6 +33,7 @@ def valid(node):
 		return True
 
 def freespace(node):
+	# True if freespace, False if obstacle
 	if imarray[node[1]][node[0]]:
 		return True
 	else:
@@ -330,7 +333,7 @@ def rrt(start,goal):
 		diff = np.rad2deg(diff)
 		#print(diff)
 
-		if (L2norm(qnew[0],goal[0]) < tol) and (abs(diff)<90): #within tolerance
+		if (L2norm(qnew[0],goal[0]) < tol) and (abs(diff)<tolang): #within tolerance
 			print('found goal!!!!')
 			sol = qnew
 			break
@@ -349,18 +352,14 @@ def rand_conf(mean):
 	return ((randx,randy),np.rad2deg(randtheta))
 	#return (int(clipped[0]),int(clipped[1])),np.rad2deg(randtheta)
 
-def draw_bicycle(bike_loc,theta,alpha,colorA=False):
-	# draw the bicycle
-	drawcolor = 'blue'
-	if colorA:
-		drawcolor='lime'
+def draw_bicycle(bike_loc,theta,alpha,color='blue'):
 	# Draw the bike frame and direction theta
 	bikeframe = [bikelength,0,0]
 	r = R.from_euler('z', theta, degrees=True)
 	bikeframe = r.apply(bikeframe)
 	x = bike_loc[0]
 	y = bike_loc[1]
-	plt.plot([x,bikeframe[0]+x],[y,bikeframe[1]+y], color=drawcolor,linewidth=5) # plot body
+	plt.plot([x,bikeframe[0]+x],[y,bikeframe[1]+y], color=color,linewidth=5) # plot body
 	plt.quiver(x,y,bikeframe[0]/2,bikeframe[1]/2,facecolor='red',edgecolor='black',linewidth=0.5,headwidth=2.5,zorder=10,angles='xy', scale_units='xy', scale=1)
 
 	# Draw the front wheel direction
@@ -478,7 +477,6 @@ def draw_path(bike_loc,theta,alpha,arclength):
 
 def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 
-	#plt.plot([bikeorigin[0],bikegoal[0]],[bikeorigin[1],bikegoal[1]])
 	midpoint = np.array([0.5*(bikeorigin[0]+bikegoal[0]),0.5*(bikeorigin[1]+bikegoal[1])])
 	bisector = np.subtract(bikeorigin,bikegoal)
 	bisector = [bisector[0],bisector[1],0]
@@ -493,9 +491,6 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 	bikeframe = r.apply(bikeframe)
 	bisector = r.apply(bisector)
 	
-	#plt.plot([midpoint[0],midpoint[0]+bisector[0]],[midpoint[1],midpoint[1]+bisector[1]],color='red')
-	#plt.plot([bikeorigin[0],bikeorigin[0]+bikeframe[0]],[bikeorigin[1], bikeorigin[1]+bikeframe[1]])
-
 	try:	
 		#curved driving if the matrix is not nearly singular or singular
 		a1,b1,c1=linefrompoints(midpoint,np.add(midpoint,bisector[:2]))
@@ -506,15 +501,14 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 
 		# solve for ICC
 		intersection = np.linalg.solve(a,b)
-		#plt.scatter(intersection[0],intersection[1],color='red',s=50)
 		if np.linalg.cond(a) > 1000000:
 			#matrix is near singular
 			raise Exception("Nearly singular")
 	
 		if plot:
 			plt.scatter(intersection[0],intersection[1],s=10,color='red',zorder=50)
-		#plt.plot([bikeorigin[0],intersection[0]],[bikeorigin[1],intersection[1]],color='orangered')
 
+		# turn radius
 		rad = np.linalg.norm(np.subtract(bikeorigin,intersection))
 
 		# Draw the bike frame and direction theta
@@ -527,10 +521,8 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 
 		steervector = np.subtract(pivot,intersection)
 		steervector = [steervector[0],steervector[1],0]
-		r = R.from_euler('z', -90, degrees=True)
+		r = R.from_euler('z', 90, degrees=True)
 		steervector = r.apply(steervector)
-		#plt.plot([pivot[0],intersection[0]],[pivot[1],intersection[1]])
-		#plt.plot([pivot[0],pivot[0]+steervector[0]],[pivot[1],pivot[1]+steervector[1]])
 
 		steervector=steervector[:2]
 		bikeframe = bikeframe[:2]
@@ -540,59 +532,56 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 
 		steerangle = standardangle(steerangle)
 		
-		# trying to get another piece working
+		# Compute the final position angle, tangent to the ICC circle at the bike frame origin
 		final = np.subtract(bikegoal,intersection)
 		final = [final[0],final[1],0]
-		r = R.from_euler('z', -90, degrees=True)
+		r = R.from_euler('z', 90, degrees=True)
 		final = r.apply(final)
-		# tangent to the circle at the goal
-		# but pointing
 
 		final=final[:2]
 		testvec = [1,0]
 		dot = np.dot(testvec,final)
 		det = final[0]*testvec[1]-testvec[0]*final[1]
 		final = -np.rad2deg(np.arctan2(det,dot))
+		
 		if (steerangle<0):
-			final = standardangle(final+180)		
+			final = standardangle(final+180)
+			if(plot):
+				print('here!!!')	
 		else:
 			# fix bug
 			final = standardangle(final)
+			if plot:
+				print('instead')
 
-		"""
-		if final<-90:
-			final = final+180
-		if final >=90:
-			final = final-180
-		"""
-		#continue
-		
 		if plot:
-			draw_bicycle(bikeorigin,theta,steerangle,colorA=True)
-			draw_bicycle(bikegoal,final,0,colorA=False)
+			print("Steer angle")
+			print(steerangle)
+			color='cyan'
+			if abs(steerangle)> 90:
+				color='pink'
+			#draw_bicycle(bikeorigin,theta,steerangle,color='blue')
+			draw_bicycle(bikegoal,final,0,color=color)
 
-		greenline = np.subtract(bikegoal,intersection)
-		greenline = greenline/np.linalg.norm(greenline)
+		icc_to_goalbike = np.subtract(bikegoal,intersection)
+		icc_to_goalbike = icc_to_goalbike /np.linalg.norm(icc_to_goalbike )
 
-		orangeline = np.subtract(bikeorigin,intersection)
-		orangeline = orangeline/np.linalg.norm(orangeline)
+		icc_to_originbike = np.subtract(bikeorigin,intersection)
+		icc_to_originbike = icc_to_originbike/np.linalg.norm(icc_to_originbike)
 		
-		dot = np.dot(np.array([1,0]),greenline)
-		det = greenline[0]*0-1*greenline[1]
+		dot = np.dot(np.array([1,0]),icc_to_goalbike)
+		det = icc_to_goalbike[0]*0-1*icc_to_goalbike[1]
 
-		dot2 = np.dot(np.array([1,0]),orangeline)
-		det2 = orangeline[0]*0-1*orangeline[1]
+		dot2 = np.dot(np.array([1,0]),icc_to_originbike)
+		det2 = icc_to_originbike[0]*0-1*icc_to_originbike[1]
 
-		dot3 = np.dot(greenline,orangeline)
-		det3 = orangeline[0]*greenline[1]-greenline[0]*orangeline[1]
+		dot3 = np.dot(icc_to_goalbike,icc_to_originbike)
+		det3 = icc_to_originbike[0]*icc_to_goalbike[1]-icc_to_goalbike[0]*icc_to_originbike[1]
 
 		angle = np.rad2deg(np.arctan2(det,dot))
 		angle2 = np.rad2deg(np.arctan2(det2,dot2))
 		angle3 = np.rad2deg(np.arctan2(det3,dot3))
 
-		angle = angle
-		angle2= angle2
-		
 		if plot:
 			if steerangle<0:
 				arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle, theta1=0, theta2=-angle3,edgecolor='magenta',linestyle='--')
@@ -600,18 +589,10 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 				arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle2, theta1=0, theta2=angle3,edgecolor='magenta',linestyle='--')
 
 			ax.add_patch(arc)
-		
-
-		#circ = patches.Circle(intersection, radius=rad,fill=False,edgecolor='magenta',linestyle='--')
-		#ax.add_patch(circ)
 		return final,steerangle
 
 	except Exception as e:
-		#print(e)
 		return theta,0
-	#plt.plot([intersection[0],bisector[0]],[intersection[1],bisector[1]])
-	
-
 
 def arclength_to_angle(radius, arclength):
 	return arclength*360/(np.pi*2*radius)
@@ -655,21 +636,12 @@ else:
 	pass
 	#print("Didn't find path")
 
-begin = ((20,20),standardangle(-90))
-end = ((60,65),standardangle(-90))
+begin = ((20,20),standardangle(-45))
+end = ((60,65),standardangle(0))
 solution,graph,camefrom = rrt( begin , end )
-draw_bicycle(begin[0],begin[1],0,colorA=True)
-draw_bicycle(end[0],end[1],0)
 
-
-if solution:
-	plt.scatter(solution[0][0],solution[0][1],color='red')
-
-"""
-for key, value in graph.items():
-	for item in value:
-		plt.plot([key[0][0],item[0][0]], [key[0][1],item[0][1]], linewidth=1)
-"""
+draw_bicycle(begin[0],begin[1],0,color='hotpink')
+draw_bicycle(end[0],end[1],0,color='green')
 
 try:
 	a = solution
@@ -677,20 +649,13 @@ try:
 	while True:
 		if b is None:
 			break
-		#draw_bicycle((a[0]),a[1],0)
-		#draw_bicycle((b[0]),b[1],0)
-		steer(a[0],a[1],b[0],b[1],plot=True)
-		print(a[1],b[1])
-		#plt.plot([a[0][0],b[0][0]], [a[0][1],b[0][1]], color='red',linewidth=1)
+		steer(b[0],b[1],a[0],a[1],plot=True)
+		print('steering from b to a')
+		print(b,a)
 		a = b # child
 		b = camefrom[b] # parent
 except Exception as e:
 	print(e)
 	print(a)
-
-#draw_path((100,150),170,30,stepsize)
-#steer((0,0),80,(50,52),0)
-#steer((50,52),0,(80,100),90)
-#steer((0,0),10,(50,52),0)
 
 plt.show()
