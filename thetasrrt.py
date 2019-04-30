@@ -255,7 +255,7 @@ def rrt(start,goal):
 	K=100 # Number of vertices in the tree
 	deltaq = 10 # incremental distance
 	G = {} # graph
-	tol = 5
+	tol = 20
 	sol = None
 	G[start] = [] # add vertex
 	cameFrom = {} # for extracting trajectory
@@ -272,7 +272,7 @@ def rrt(start,goal):
 		index = np.argmin([L2norm(item[0],qrand[0]) for item in keys])
 		qnear = keys[index]
 		
-		angle = standardangle(steer(qrand[0], qrand[1], qnear[0], qnear[1]))
+		angle = standardangle(steer(qnear[0], qnear[1], qrand[0], qrand[1]))
 		qnew = (qrand[0],angle)
 		"""
 		vector = np.array(list(np.subtract(qrand,qnear))) # points from qnear to qrand
@@ -588,7 +588,7 @@ def linefrompoints(p,q):
 	c = a*p[0]+b*p[1]
 	return a,b,c
 
-img = Image.open('map1.png').convert('1')
+img = Image.open('blank.png').convert('1')
 imarray = np.array(img)
 
 imgplot = plt.imshow(img)
@@ -614,11 +614,11 @@ else:
 	pass
 	#print("Didn't find path")
 
-begin = ((55,80),-90)
-end = ((87,15),-90)
+begin = ((20,20),-90)
+end = ((60,65),-90)
 solution,graph,camefrom = rrt( begin , end )
-#draw_bicycle(begin[0],begin[1],0)
-#draw_bicycle(end[0],end[1],0)
+draw_bicycle(begin[0],begin[1],0)
+draw_bicycle(end[0],end[1],0)
 
 
 if solution:
