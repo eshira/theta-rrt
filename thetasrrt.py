@@ -427,11 +427,88 @@ def draw_path(bike_loc,theta,alpha,arclength):
 		plt.plot([bikeorigin[0],newbikeorigin[0]],[bikeorigin[1],newbikeorigin[1]],color='magenta',linestyle='--')
 		draw_bicycle(newbikeorigin[0],newbikeorigin[1],theta,alpha)
 
-def steer():
-	#plt.plot([bikeorigin[0],newbikeorigin[0]],[bikeorigin[1],newbikeorigin[1]])
-	#bisector = (0.5*(bikeorigin[0]+newbikeorigin[0]),0.5*(bikeorigin[1]+newbikeorigin[1]))
+def steer(bikeorigin, theta, bikegoal, thetagoal):
+
+	plt.plot([bikeorigin[0],bikegoal[0]],[bikeorigin[1],bikegoal[1]])
+	midpoint = np.array([0.5*(bikeorigin[0]+bikegoal[0]),0.5*(bikeorigin[1]+bikegoal[1])])
+	bisector = np.subtract(bikeorigin,bikegoal)
+	bisector = [bisector[0],bisector[1],0]
+
+	# Find pivot point of bike and vector of frame of bike
+	bikeframe = [bikelength,0,0]
+	r = R.from_euler('z', theta, degrees=True)
+	bikeframe = r.apply(bikeframe)
+	
+	# Get vector normal to frame of bike
+	r = R.from_euler('z', 90, degrees=True)
+	bikeframe = r.apply(bikeframe)
+	bisector = r.apply(bisector)
+	
+	plt.plot([midpoint[0],midpoint[0]+bisector[0]],[midpoint[1],midpoint[1]+bisector[1]],color='red')
+	plt.plot([bikeorigin[0],bikeorigin[0]+bikeframe[0]],[bikeorigin[1], bikeorigin[1]+bikeframe[1]])
+
+	try:	
+		#curved driving if the matrix is not nearly singular or singular
+		a1,b1,c1=linefrompoints(midpoint,np.add(midpoint,bisector[:2]))
+		a2,b2,c2=linefrompoints(bikeorigin,np.add(bikeorigin,bikeframe[:2]))
+
+		a = np.array([[a1,b1],[a2,b2]])
+		b = np.array([c1,c2])
+
+		# solve for ICC
+		intersection = np.linalg.solve(a,b)
+		plt.scatter(intersection[0],intersection[1])
+		if np.linalg.cond(a) > 1000000:
+			#matrix is near singular
+			raise Exception("Nearly singular")
+	
+		plt.scatter(intersection[0],intersection[1],s=10,color='red',zorder=50)
+		plt.plot([bikeorigin[0],intersection[0]],[bikeorigin[1],intersection[1]],color='orangered')
+
+		rad = np.linalg.norm(np.subtract(bikeorigin,intersection))
+
+		# Draw the bike frame and direction theta
+		bikeframe = [bikelength,0,0]
+		r = R.from_euler('z', theta, degrees=True)
+		bikeframe = r.apply(bikeframe)
+		x = bikeorigin[0]
+		y = bikeorigin[1]
+		pivot = (bikeframe[0]+x,bikeframe[1]+y)
+
+		steervector = np.subtract(pivot,intersection)
+		steervector = [steervector[0],steervector[1],0]
+		r = R.from_euler('z', -90, degrees=True)
+		steervector = r.apply(steervector)
+		plt.plot([pivot[0],intersection[0]],[pivot[1],intersection[1]])
+		plt.plot([pivot[0],pivot[0]+steervector[0]],[pivot[1],pivot[1]+steervector[1]])
+
+		steervector=steervector[:2]
+		bikeframe = bikeframe[:2]
+		dot = np.dot(bikeframe,steervector)
+		det = steervector[0]*bikeframe[1]-bikeframe[0]*steervector[1]
+		angle = -np.rad2deg(np.arctan2(det,dot))
+
+		if angle<-90:
+			angle = angle+180
+		if angle >90:
+			angle = angle-180
+		print(angle)
+		#if alpha<0:
+		#	arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle, theta1=0, theta2=-angle3,edgecolor='magenta',linestyle='--')
+		#else:
+		#	arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle2, theta1=0, theta2=angle3,edgecolor='magenta',linestyle='--')
+
+		#ax.add_patch(arc)
+
+		circ = patches.Circle(intersection, radius=rad,fill=False,edgecolor='magenta',linestyle='--')
+		ax.add_patch(circ)
+
+		draw_bicycle(bikeorigin,theta,angle)
+		draw_bicycle(bikegoal,thetagoal,0)
+	except Exception as e:
+		print(e)
 	#plt.plot([intersection[0],bisector[0]],[intersection[1],bisector[1]])
-	pass
+	
 
 def arclength_to_angle(radius, arclength):
 	return arclength*360/(np.pi*2*radius)
@@ -449,7 +526,7 @@ def linefrompoints(p,q):
 	c = a*p[0]+b*p[1]
 	return a,b,c
 
-img = Image.open('map2.png').convert('1')
+img = Image.open('blank.png').convert('1')
 imarray = np.array(img)
 
 imgplot = plt.imshow(img)
@@ -501,6 +578,9 @@ except Exception as e:
 
 #draw_bicycle(25,25,45,45)
 #draw_bicycle(50,50,90,25)
-draw_path((100,150),170,30,stepsize)
+#draw_path((100,150),170,30,stepsize)
+steer((0,0),80,(50,52),0)
+steer((50,52),0,(80,100),90)
+#steer((0,0),10,(50,52),0)
 
 plt.show()
