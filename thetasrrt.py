@@ -12,8 +12,8 @@ from scipy.spatial.transform import Rotation as R # for consistently doing rotat
 THETASTAR = True # can turn off or on
 bikelength = 5 # Specify the bike frame length
 stepsize = 10 # specify arclength for steps
-tol = 10 # tolerance for goal xy
-tolang = 45
+tol = 5 # tolerance for goal xy
+tolang = 25
 
 def heuristic(node, goal):
 	# Wrapper for convenience, easy to swap out what to use here
@@ -265,7 +265,7 @@ def standardangle(angle):
 def rrt(start,goal):
 	start = (start[0],standardangle(start[1]))
 	goal = (goal[0],standardangle(goal[1]))
-	K=1000 # Number of vertices in the tree
+	K=10 # Number of vertices in the tree
 	deltaq = 10 # incremental distance
 	G = {} # graph
 	sol = None
@@ -273,9 +273,8 @@ def rrt(start,goal):
 	cameFrom = {} # for extracting trajectory
 	cameFrom[start] = None
 
-
 	for k in range(1,K):
-		qrand = (rand_conf(goal[0]))
+		qrand = (rand_conf(goal))
 		qrand = (qrand[0],standardangle(qrand[1]))
 		
 		# If qrand falls on an obstacle or is in the set of keys
@@ -289,9 +288,11 @@ def rrt(start,goal):
 		index = np.argmin([L2norm(item[0],qrand[0]) for item in keys])
 		qnear = keys[index]
 		
-		finalang,steerang = steer(qnear[0], qnear[1], qrand[0], qrand[1])
+		finalang,steerang = steer(qnear[0], qnear[1], qrand[0], qrand[1],plot=True)
 		finalang = standardangle(finalang)
 		steerang = standardangle(steerang)
+		if (steerang<-45) or (steerang>45): #constraints on steering
+			continue
 
 		if steerang == 0: # straight line driving
 			vector = np.subtract(qrand[0],qnear[0]) # vector points from qnear to qrand
@@ -334,6 +335,7 @@ def rrt(start,goal):
 		#print(diff)
 
 		if (L2norm(qnew[0],goal[0]) < tol) and (abs(diff)<tolang): #within tolerance
+			draw_bicycle(qnew[0],qnew[1],0,color='hotpink')
 			print('found goal!!!!')
 			sol = qnew
 			break
@@ -342,14 +344,17 @@ def rrt(start,goal):
 	return sol,G,cameFrom
 
 def rand_conf(mean):
-	randx = random.randint(1,imarray.shape[0]-1)
-	randy = random.randint(1,imarray.shape[1]-1)
-	#randx,randy = np.random.normal(mean, [0.5*imarray.shape[0],0.5*imarray.shape[1]], 2)
-	#clipped = np.array([randx,randy])
-	#np.clip([randx,randy], [0,0], [imarray.shape[0]-1,imarray.shape[1]-1], out=clipped)
+	#randx = random.randint(1,imarray.shape[0]-1)
+	#randy = random.randint(1,imarray.shape[1]-1)
+	randx,randy = np.random.normal(mean[0], [0.5*imarray.shape[0],0.5*imarray.shape[1]], 2)
+	clipped = np.array([randx,randy])
+	np.clip([randx,randy], [0,0], [imarray.shape[0]-1,imarray.shape[1]-1], out=clipped)
 	
-	randtheta = np.random.uniform(0,2*np.pi)
-	return ((randx,randy),np.rad2deg(randtheta))
+	#randtheta = np.rad2deg(np.random.uniform(0,2*np.pi))
+	stddevdeg = 5
+	randtheta = np.random.normal(mean[1],stddevdeg,1)[0]
+	randtheta = standardangle(randtheta)
+	return ((int(clipped[0]),int(clipped[1])),randtheta)
 	#return (int(clipped[0]),int(clipped[1])),np.rad2deg(randtheta)
 
 def draw_bicycle(bike_loc,theta,alpha,color='blue'):
@@ -476,7 +481,6 @@ def draw_path(bike_loc,theta,alpha,arclength):
 		draw_bicycle(newbikeorigin[0],newbikeorigin[1],theta,alpha)
 
 def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
-
 	midpoint = np.array([0.5*(bikeorigin[0]+bikegoal[0]),0.5*(bikeorigin[1]+bikegoal[1])])
 	bisector = np.subtract(bikeorigin,bikegoal)
 	bisector = [bisector[0],bisector[1],0]
@@ -506,7 +510,8 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 			raise Exception("Nearly singular")
 	
 		if plot:
-			plt.scatter(intersection[0],intersection[1],s=10,color='red',zorder=50)
+			pass
+			#plt.scatter(intersection[0],intersection[1],s=10,color='red',zorder=50)
 
 		# turn radius
 		rad = np.linalg.norm(np.subtract(bikeorigin,intersection))
@@ -537,7 +542,13 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 		final = [final[0],final[1],0]
 		
 		steerangle = standardangle(steerangle)
-		# now steerangle is -180 to 180
+
+		flip=False
+		# If the bicycle is trying to steer backwards, we don't let it; ought to try the longer path forward?
+		if (steerangle>90) or (steerangle<-90):
+			steerangle = steerangle+180
+			flip = True
+	
 		# Front Right and Back left steering case
 		if ((steerangle >= 0) and (steerangle <90)) or ((steerangle <= -90) and (steerangle > -180)):
 			r = R.from_euler('z', 90, degrees=True)
@@ -572,11 +583,14 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 		angle2 = np.rad2deg(np.arctan2(det2,dot2))
 		angle3 = np.rad2deg(np.arctan2(det3,dot3))
 
+		color='magenta'
+		if flip:
+			color='cyan'
 		if plot:
-			if steerangle<0:
-				arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle, theta1=0, theta2=-angle3,edgecolor='magenta',linestyle='--')
+			if flip or steerangle<0:
+				arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle, theta1=0, theta2=-angle3,edgecolor=color,linestyle='--')
 			else:
-				arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle2, theta1=0, theta2=angle3,edgecolor='magenta',linestyle='--')
+				arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle2, theta1=0, theta2=angle3,edgecolor=color,linestyle='--')
 
 			ax.add_patch(arc)
 			draw_bicycle(bikeorigin,theta,steerangle,color='blue')
@@ -629,11 +643,11 @@ else:
 	pass
 	#print("Didn't find path")
 
-begin = ((20,20),standardangle(-45))
-end = ((60,65),standardangle(0))
+begin = ((20,20),standardangle(135))
+end = ((105,105),standardangle(45))
 solution,graph,camefrom = rrt( begin , end )
 
-draw_bicycle(begin[0],begin[1],0,color='hotpink')
+draw_bicycle(begin[0],begin[1],0,color='orangered')
 draw_bicycle(end[0],end[1],0,color='green')
 
 try:
