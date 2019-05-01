@@ -529,39 +529,29 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 		dot = np.dot(bikeframe,steervector)
 		det = steervector[0]*bikeframe[1]-bikeframe[0]*steervector[1]
 		steerangle = -np.rad2deg(np.arctan2(det,dot))
-
-		steerangle = standardangle(steerangle)
 		
-		# Compute the final position angle, tangent to the ICC circle at the bike frame origin
+		# positive steer is right
+		# if steering right, point to ICC, turn left 90
+		# if steering left, point to ICC, turn rigt
 		final = np.subtract(bikegoal,intersection)
 		final = [final[0],final[1],0]
-		r = R.from_euler('z', 90, degrees=True)
-		final = r.apply(final)
+		
+		steerangle = standardangle(steerangle)
+		# now steerangle is -180 to 180
+		# Front Right and Back left steering case
+		if ((steerangle >= 0) and (steerangle <90)) or ((steerangle <= -90) and (steerangle > -180)):
+			r = R.from_euler('z', 90, degrees=True)
+		# Front left and back right
+		else:
+			r = R.from_euler('z',-90,degrees=True)
 
+		final = r.apply(final)
 		final=final[:2]
+		
 		testvec = [1,0]
 		dot = np.dot(testvec,final)
 		det = final[0]*testvec[1]-testvec[0]*final[1]
 		final = -np.rad2deg(np.arctan2(det,dot))
-		
-		if (steerangle<0):
-			final = standardangle(final+180)
-			if(plot):
-				print('here!!!')	
-		else:
-			# fix bug
-			final = standardangle(final)
-			if plot:
-				print('instead')
-
-		if plot:
-			print("Steer angle")
-			print(steerangle)
-			color='cyan'
-			if abs(steerangle)> 90:
-				color='pink'
-			#draw_bicycle(bikeorigin,theta,steerangle,color='blue')
-			draw_bicycle(bikegoal,final,0,color=color)
 
 		icc_to_goalbike = np.subtract(bikegoal,intersection)
 		icc_to_goalbike = icc_to_goalbike /np.linalg.norm(icc_to_goalbike )
@@ -589,6 +579,9 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 				arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle2, theta1=0, theta2=angle3,edgecolor='magenta',linestyle='--')
 
 			ax.add_patch(arc)
+			draw_bicycle(bikeorigin,theta,steerangle,color='blue')
+			draw_bicycle(bikegoal,final,0,color='cyan')			
+
 		return final,steerangle
 
 	except Exception as e:
@@ -650,8 +643,6 @@ try:
 		if b is None:
 			break
 		steer(b[0],b[1],a[0],a[1],plot=True)
-		print('steering from b to a')
-		print(b,a)
 		a = b # child
 		b = camefrom[b] # parent
 except Exception as e:
