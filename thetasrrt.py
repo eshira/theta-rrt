@@ -14,6 +14,10 @@ stepsize = 10 # specify arclength for steps
 tol = 5 # tolerance for goal xy
 tolang = 25 # tolerance for final angle to goal angle
 
+# Relative weighting between xy and angle
+weightxy = .5
+# The weight for the angle will be the complement
+
 bikelength = 5 # Specify the bike frame length
 LEFTCONSTRAINT = -45
 RIGHTCONSTRAINT = 45
@@ -250,16 +254,7 @@ def astar(start,goal): # Pass in two tuples in the form (x,y)
 
 	return False
 
-def standardangle(angle):
-	"""
-	r1 = R.from_euler('z', angle, degrees=True)
-	r2 = R.from_euler('z', 0, degrees=True)
-	diff = r1.inv()*r2
-	diff = diff.as_euler('xyz')[2]
-	diff = np.rad2deg(diff)
-	return diff
-	"""
-	
+def standardangle(angle):	
 	while angle >180:
 		angle = angle-360
 	while angle <= -180:
@@ -269,7 +264,7 @@ def standardangle(angle):
 def rrt(start,goal):
 	start = (start[0],standardangle(start[1]))
 	goal = (goal[0],standardangle(goal[1]))
-	K=10 # Number of vertices in the tree
+	K=5 # Number of vertices in the tree
 	deltaq = 10 # incremental distance
 	G = {} # graph
 	sol = None
@@ -488,10 +483,6 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 		if np.linalg.cond(a) > 1000000:
 			#matrix is near singular
 			raise Exception("Nearly singular")
-	
-		if plot:
-			pass
-			#plt.scatter(intersection[0],intersection[1],s=10,color='red',zorder=50)
 
 		# turn radius
 		rad = np.linalg.norm(np.subtract(bikeorigin,intersection))
@@ -532,12 +523,15 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 			steerangle = standardangle(steerangle)
 			flip = True
 	
+		c_ccw = 0
 		# Front Right and Back left steering case
 		if ((steerangle >= 0) and (steerangle <90)) or ((steerangle <= -90) and (steerangle > -180)):
 			r = R.from_euler('z', 90, degrees=True)
+			c_ccw = -90
 		# Front left and back right
 		else:
 			r = R.from_euler('z',-90,degrees=True)
+			c_ccw = 90
 
 		final_angle = r.apply(final_angle)
 		final_angle=final_angle[:2]
@@ -566,6 +560,82 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 		angle2 = np.rad2deg(np.arctan2(det2,dot2))
 		angle3 = np.rad2deg(np.arctan2(det3,dot3))
 
+		# All Angle Goal Point in CYAN
+		vec2 = [1,0,0]
+		thetagoal2 = thetagoal+c_ccw
+		r2 = R.from_euler('z',thetagoal2,degrees=True)
+		vec2 = r2.apply(vec2)
+		# Normalize that vector and make it length radius
+		vec2 = rad*vec2/np.linalg.norm(vec2)
+		vec2 = vec2[:2]
+		# The point that it lands on achieves the angle.
+		goalanglept = np.add(intersection,vec2)
+		#plt.scatter(goalanglept[0],goalanglept[1], s=30, color='cyan')
+		
+		# First mix point in RED
+		mix = weightxy*standardangle(final_angle) + (1-weightxy)*standardangle(thetagoal)
+		vec2 = [1,0,0]
+		thetagoal2 = (mix)+c_ccw
+		r2 = R.from_euler('z',thetagoal2,degrees=True)
+		vec2 = r2.apply(vec2)
+		# Normalize that vector and make it length radius
+		vec2 = rad*vec2/np.linalg.norm(vec2)
+		vec2 = vec2[:2]
+		mix1 = vec2
+		# The point that it lands on achieves the angle.
+		goalanglept = np.add(intersection,vec2)
+		#plt.scatter(goalanglept[0],goalanglept[1], s=100,color='green')
+		#draw_bicycle(goalanglept,mix,0,color='yellow')
+		#final angle vs thetagoal, mix.
+
+		# Second mix point in LIME
+		mix = standardangle(mix+180)
+		vec2 = [1,0,0]
+		thetagoal2 = (mix)+c_ccw
+		r2 = R.from_euler('z',thetagoal2,degrees=True)
+		vec2 = r2.apply(vec2)
+		# Normalize that vector and make it length radius
+		vec2 = rad*vec2/np.linalg.norm(vec2)
+		vec2 = vec2[:2]
+		mix2 = vec2
+		# The point that it lands on achieves the angle.
+		goalanglept = np.add(intersection,vec2)
+		#plt.scatter(goalanglept[0],goalanglept[1], s=100,color='green')
+		#draw_bicycle(goalanglept,mix,0,color='lime')
+
+		#circle = patches.Circle(intersection, radius=rad,color='pink',linestyle='--',fill=None)
+		#ax.add_patch(circle)
+		#draw_bicycle(goalanglept,thetagoal,0,color='pink')
+
+		# Vector mix1
+		# Vector mix2 is mix1 rotated 180
+		# Compare differences in angle to bike1
+
+		# Vector max arclength away from start position
+		# icc_to_originbike
+
+		dot = np.dot(mix1,icc_to_originbike)
+		det = icc_to_originbike[0]*mix1[1]-mix1[0]*icc_to_originbike[1]
+
+		dot1 = np.dot(mix2,icc_to_originbike)
+		det1 = icc_to_originbike[0]*mix2[1]-mix2[0]*icc_to_originbike[1]
+		
+		angleA = np.rad2deg(np.arctan2(det,dot))
+		angleB = np.rad2deg(np.arctan2(det1,dot1))
+
+		print(angleA,angleB)
+		if ((angleA>angleB) and steerangle<0) or  ((angleA<=angleB) and steerangle>=0):
+			mix1 = mix2
+			mix = weightxy*standardangle(final_angle) + (1-weightxy)*standardangle(thetagoal)-180
+			mix = standardangle(mix)
+		else:
+			mix = weightxy*standardangle(final_angle) + (1-weightxy)*standardangle(thetagoal)
+			mix = standardangle(mix)
+		# The point that it lands on achieves the angle.
+		goalanglept = np.add(intersection,mix1)
+		draw_bicycle(goalanglept,mix,0,color='lime')
+
+
 		color='magenta'
 		if flip:
 			color='cyan'
@@ -584,6 +654,7 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 		return (bikegoal,final_angle),(steerangle,arclength,intersection,rad)
 
 	except Exception as e: # Singular matrix; straight line driving
+		print(e)
 		arclength = 0 # dummy placeholder for now
 		return (bikegoal,theta),(0,arclength, None,rad)
 		#return theta,0
