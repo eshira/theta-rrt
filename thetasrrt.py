@@ -335,10 +335,11 @@ def rand_conf(mean):
 	clipped = np.array([randx,randy])
 	np.clip([randx,randy], [0,0], [imarray.shape[0]-1,imarray.shape[1]-1], out=clipped)
 	
-	randtheta = standardangle(np.rad2deg(np.random.uniform(0,2*np.pi)))
-	#stddevdeg = 5
-	#randtheta = np.random.normal(standardangle(mean[1]),stddevdeg,1)[0]
-	#randtheta = standardangle(randtheta)
+	#randtheta = standardangle(np.rad2deg(np.random.uniform(0,2*np.pi)))
+	stddevdeg = 5
+	randtheta = np.random.normal(standardangle(mean[1]),stddevdeg,1)[0]
+	randtheta = standardangle(randtheta)
+	#print(randtheta)
 	return ((int(clipped[0]),int(clipped[1])),randtheta)
 	#return (int(clipped[0]),int(clipped[1])),np.rad2deg(randtheta)
 
@@ -426,7 +427,9 @@ def draw_path(bike1,bike2,u):
 			arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle2, theta1=0, theta2=angle3,edgecolor=color,linestyle='--')
 
 		ax.add_patch(arc)
-
+	
+	else:
+		plt.plot([bike1[0][0],bike2[0][0]],[bike1[0][1],bike2[0][1]],linestyle='--',color='red')
 	
 	#draw_bicycle(bike1[0],bike1[1],u[0],color='red')
 	draw_bicycle(bike2[0],bike2[1],0,color='blue')
@@ -632,6 +635,9 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 	except Exception as e: # Singular matrix; straight line driving
 		print(e)
 		arclength = 0 # dummy placeholder for now
+		if plot:
+			plt.plot([bikeorigin[0],bikegoal[0]],[bikeorigin[1],bikegoal[1]],linestyle='--',color='pink')
+			draw_bicycle(bikegoal,thetagoal,0,color='blue')
 		return (bikegoal,theta),(0,arclength, None,None)
 		#return theta,0
 
@@ -677,8 +683,9 @@ else:
 	pass
 	#print("Didn't find path")
 
-begin = ((20,20),standardangle(135))
-end = ((105,105),standardangle(45))
+begin = ((20,20),standardangle(45))
+end = ((105,105),standardangle(35))
+
 solution,graph,camefrom = rrt( begin , end )
 
 draw_bicycle(begin[0],begin[1],0,color='orangered')
