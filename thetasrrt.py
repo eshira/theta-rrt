@@ -264,7 +264,7 @@ def standardangle(angle):
 def rrt(start,goal):
 	start = (start[0],standardangle(start[1]))
 	goal = (goal[0],standardangle(goal[1]))
-	K=5 # Number of vertices in the tree
+	K=1000 # Number of vertices in the tree
 	deltaq = 10 # incremental distance
 	G = {} # graph
 	sol = None
@@ -288,59 +288,38 @@ def rrt(start,goal):
 		qnear = keys[index]
 		
 		#finalang,steerang = steer(qnear[0], qnear[1], qrand[0], qrand[1],plot=True)
-		#(bikegoal,final_angle),(steerangle,arclength)
+		#(bikegoal,final_angle),(steerangle,arclength, interection, rad)
+		#(bikegoal,theta),(0,arclength, None,rad) for straight line
 		qdrive,u = steer(qnear[0], qnear[1], qrand[0], qrand[1],plot=False)
-		draw_path(qnear,qdrive,u)
+		qnew = ((int(qdrive[0][0]),int(qdrive[0][1])),qdrive[1])
 
 		finalang = qdrive[1]
 		steerang = u[0]
-
-		#draw_path()
 
 		finalang = standardangle(finalang)
 		steerang = standardangle(steerang)
 		if (steerang<LEFTCONSTRAINT) or (steerang>RIGHTCONSTRAINT): #constraints on steering
 			continue
-
-		if steerang == 0: # straight line driving
-			vector = np.subtract(qrand[0],qnear[0]) # vector points from qnear to qrand
-			if(np.linalg.norm(vector)>0.000001): # try to normalize
-				vector = deltaq*vector/np.linalg.norm(vector)
-			else:
-				# too close. pick a new one
-				continue
-		
-			if np.linalg.norm(vector) > np.linalg.norm(np.array(list(np.subtract(qrand[0],qnear[0])))):
-				# just go to the qrand, otherwise overshoot
-				qnew = qrand
-			else:
-				#print(vector)
-				qnew = (tuple(np.add(qnear[0],vector).astype(int)),qnear[1])
-				# test; later would move qnew incremental deltaq in direction qrand
-		else:
-			qnew = (qrand[0],finalang)
-
 		if (not valid(qnew[0])):
 			continue
 		if not lineofsight(qnew[0],qnear[0]):
 			continue
-
 		if not (qnew in G.keys()):
 			G[qnew] = [] # vertex
+
+		# To do, make draw_path deal with straight linees
+		#draw_path(qnear,qdrive,u)
 
 		G[qnear].append(qnew) # add edge
 
 		if qnew != qnear:
 			cameFrom[qnew] = qnear
 
-		#print(standardangle(qnew[1]))
-		#print(standardangle(goal[1]))
 		r1 = R.from_euler('z', qnew[1], degrees=True)
 		r2 = R.from_euler('z', goal[1], degrees=True)
 		diff = r1.inv()*r2
 		diff = diff.as_euler('xyz')[2]
 		diff = np.rad2deg(diff)
-		#print(diff)
 
 		if (L2norm(qnew[0],goal[0]) < tol) and (abs(diff)<tolang): #within tolerance
 			draw_bicycle(qnew[0],qnew[1],0,color='hotpink')
@@ -541,25 +520,6 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 		det = final_angle[0]*testvec[1]-testvec[0]*final_angle[1]
 		final_angle = -np.rad2deg(np.arctan2(det,dot))
 
-		icc_to_goalbike = np.subtract(bikegoal,intersection)
-		icc_to_goalbike = icc_to_goalbike /np.linalg.norm(icc_to_goalbike )
-
-		icc_to_originbike = np.subtract(bikeorigin,intersection)
-		icc_to_originbike = icc_to_originbike/np.linalg.norm(icc_to_originbike)
-		
-		dot = np.dot(np.array([1,0]),icc_to_goalbike)
-		det = icc_to_goalbike[0]*0-1*icc_to_goalbike[1]
-
-		dot2 = np.dot(np.array([1,0]),icc_to_originbike)
-		det2 = icc_to_originbike[0]*0-1*icc_to_originbike[1]
-
-		dot3 = np.dot(icc_to_goalbike,icc_to_originbike)
-		det3 = icc_to_originbike[0]*icc_to_goalbike[1]-icc_to_goalbike[0]*icc_to_originbike[1]
-
-		angle = np.rad2deg(np.arctan2(det,dot))
-		angle2 = np.rad2deg(np.arctan2(det2,dot2))
-		angle3 = np.rad2deg(np.arctan2(det3,dot3))
-
 		# All Angle Goal Point in CYAN
 		vec2 = [1,0,0]
 		thetagoal2 = thetagoal+c_ccw
@@ -614,6 +574,9 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 		# Vector max arclength away from start position
 		# icc_to_originbike
 
+		icc_to_originbike = np.subtract(bikeorigin,intersection)
+		icc_to_originbike = icc_to_originbike/np.linalg.norm(icc_to_originbike)
+
 		dot = np.dot(mix1,icc_to_originbike)
 		det = icc_to_originbike[0]*mix1[1]-mix1[0]*icc_to_originbike[1]
 
@@ -623,7 +586,6 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 		angleA = np.rad2deg(np.arctan2(det,dot))
 		angleB = np.rad2deg(np.arctan2(det1,dot1))
 
-		print(angleA,angleB)
 		if ((angleA>angleB) and steerangle<0) or  ((angleA<=angleB) and steerangle>=0):
 			mix1 = mix2
 			mix = weightxy*standardangle(final_angle) + (1-weightxy)*standardangle(thetagoal)-180
@@ -633,7 +595,23 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 			mix = standardangle(mix)
 		# The point that it lands on achieves the angle.
 		goalanglept = np.add(intersection,mix1)
-		draw_bicycle(goalanglept,mix,0,color='lime')
+		#draw_bicycle(goalanglept,mix,steerangle,color='pink')
+
+		icc_to_goalbike = np.subtract(goalanglept,intersection)
+		icc_to_goalbike = icc_to_goalbike /np.linalg.norm(icc_to_goalbike )
+		
+		dot = np.dot(np.array([1,0]),icc_to_goalbike)
+		det = icc_to_goalbike[0]*0-1*icc_to_goalbike[1]
+
+		dot2 = np.dot(np.array([1,0]),icc_to_originbike)
+		det2 = icc_to_originbike[0]*0-1*icc_to_originbike[1]
+
+		dot3 = np.dot(icc_to_goalbike,icc_to_originbike)
+		det3 = icc_to_originbike[0]*icc_to_goalbike[1]-icc_to_goalbike[0]*icc_to_originbike[1]
+
+		angle = np.rad2deg(np.arctan2(det,dot))
+		angle2 = np.rad2deg(np.arctan2(det2,dot2))
+		angle3 = np.rad2deg(np.arctan2(det3,dot3))
 
 
 		color='magenta'
@@ -651,12 +629,12 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 
 		arclength = 0 # dummy placeholder for now
 		# Return the final bike state and useful info relating to u, the controls
-		return (bikegoal,final_angle),(steerangle,arclength,intersection,rad)
+		return (goalanglept,mix),(steerangle,arclength,intersection,rad)
 
 	except Exception as e: # Singular matrix; straight line driving
 		print(e)
 		arclength = 0 # dummy placeholder for now
-		return (bikegoal,theta),(0,arclength, None,rad)
+		return (bikegoal,theta),(0,arclength, None,None)
 		#return theta,0
 
 def arclength_to_angle(radius, arclength):
