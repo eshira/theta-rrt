@@ -13,10 +13,9 @@ THETASTAR = True # can turn off or on
 stepsize = 10 # specify arclength for steps
 tol = 5 # tolerance for goal xy
 tolang = 25 # tolerance for final angle to goal angle
-
+xydev = 0.025 # multiplier (times image dimensions) for standard deviation for normal dist for xy goal biasing
 # Relative weighting between xy and angle
-weightxy = .5
-# The weight for the angle will be the complement
+weightxy = .8 # The weight for the angle will be the complement
 
 bikelength = 5 # Specify the bike frame length
 LEFTCONSTRAINT = -45
@@ -254,7 +253,7 @@ def astar(start,goal): # Pass in two tuples in the form (x,y)
 
 	return False
 
-def standardangle(angle):	
+def standardangle(angle):
 	while angle >180:
 		angle = angle-360
 	while angle <= -180:
@@ -264,7 +263,7 @@ def standardangle(angle):
 def rrt(start,goal):
 	start = (start[0],standardangle(start[1]))
 	goal = (goal[0],standardangle(goal[1]))
-	K=1000 # Number of vertices in the tree
+	K=500 # Number of vertices in the tree
 	deltaq = 10 # incremental distance
 	G = {} # graph
 	sol = None
@@ -322,7 +321,6 @@ def rrt(start,goal):
 		diff = np.rad2deg(diff)
 
 		if (L2norm(qnew[0],goal[0]) < tol) and (abs(diff)<tolang): #within tolerance
-			draw_bicycle(qnew[0],qnew[1],0,color='hotpink')
 			print('found goal!!!!')
 			sol = qnew
 			break
@@ -333,14 +331,14 @@ def rrt(start,goal):
 def rand_conf(mean):
 	#randx = random.randint(1,imarray.shape[0]-1)
 	#randy = random.randint(1,imarray.shape[1]-1)
-	randx,randy = np.random.normal(mean[0], [0.25*imarray.shape[0],0.25*imarray.shape[1]], 2)
+	randx,randy = np.random.normal(mean[0], [xydev*imarray.shape[0],xydev*imarray.shape[1]], 2)
 	clipped = np.array([randx,randy])
 	np.clip([randx,randy], [0,0], [imarray.shape[0]-1,imarray.shape[1]-1], out=clipped)
 	
-	#randtheta = np.rad2deg(np.random.uniform(0,2*np.pi))
-	stddevdeg = 5
-	randtheta = np.random.normal(mean[1],stddevdeg,1)[0]
-	randtheta = standardangle(randtheta)
+	randtheta = standardangle(np.rad2deg(np.random.uniform(0,2*np.pi)))
+	#stddevdeg = 5
+	#randtheta = np.random.normal(standardangle(mean[1]),stddevdeg,1)[0]
+	#randtheta = standardangle(randtheta)
 	return ((int(clipped[0]),int(clipped[1])),randtheta)
 	#return (int(clipped[0]),int(clipped[1])),np.rad2deg(randtheta)
 
@@ -416,7 +414,7 @@ def draw_path(bike1,bike2,u):
 			steerangle = steerangle+180
 			flip = True
 
-		color='magenta'
+		color='lime'
 		#print(u[0])
 		if  u[0]<-0: #right left coloring
 			# if you want to make it color based on backward/forward, use ((u[0]>90) or (u[0]<-90)):
@@ -430,8 +428,8 @@ def draw_path(bike1,bike2,u):
 		ax.add_patch(arc)
 
 	
-	draw_bicycle(bike1[0],bike1[1],u[0],color='blue')
-	draw_bicycle(bike2[0],bike2[1],0,color='cyan')
+	#draw_bicycle(bike1[0],bike1[1],u[0],color='red')
+	draw_bicycle(bike2[0],bike2[1],0,color='blue')
 
 def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 	# Find the midpoint and bisector of the line between origin and goal
@@ -616,7 +614,7 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 
 		color='magenta'
 		if flip:
-			color='cyan'
+			color='blue'
 		if plot:
 			if flip or steerangle<0:
 				arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle, theta1=0, theta2=-angle3,edgecolor=color,linestyle='--')
@@ -624,8 +622,8 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 				arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle2, theta1=0, theta2=angle3,edgecolor=color,linestyle='--')
 
 			ax.add_patch(arc)
-			draw_bicycle(bikeorigin,theta,steerangle,color='blue')
-			draw_bicycle(bikegoal,final_angle,0,color='cyan')			
+			#draw_bicycle(bikeorigin,theta,steerangle,color='blue')
+			draw_bicycle(bikegoal,final_angle,0,color='blue')			
 
 		arclength = 0 # dummy placeholder for now
 		# Return the final bike state and useful info relating to u, the controls
