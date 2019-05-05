@@ -209,8 +209,8 @@ def draw_path_segment(bike1,bike2,u):
 	else:
 		plt.plot([bike1[0][0],bike2[0][0]],[bike1[0][1],bike2[0][1]],linestyle='--',color='red')
 	
-	#draw_bicycle(bike1[0],bike1[1],u[0],color='red')
-	draw_bicycle(bike2[0],bike2[1],0,color='blue')
+	draw_bicycle(bike1[0],bike1[1],u[0],color='blue')
+	#draw_bicycle(bike2[0],bike2[1],0,color='blue')
 
 def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 	""" Steer the bike towards the bikegoal in a single step attempt
@@ -353,8 +353,8 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 				arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle2, theta1=0, theta2=angle3,edgecolor=color,linestyle='--')
 
 			ax.add_patch(arc)
-			#draw_bicycle(bikeorigin,theta,steerangle,color='cyan')
-			draw_bicycle(goal_point,final_angle,0,color='blue')			
+			draw_bicycle(bikeorigin,theta,steerangle,color='blue')
+			#draw_bicycle(goal_point,final_angle,0,color='blue')			
 
 		# Return the final bike state and useful info relating to u, the controls
 		return (goal_point,final_angle),(steerangle,intersection,rad)
