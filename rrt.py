@@ -73,22 +73,31 @@ def anglebetween(vec1,vec2):
 	# Compute the angle between to vectors
 	dot = np.dot(vec1[:2],vec2)
 	det = vec2[0]*vec1[1]-vec1[0]*vec2[1]
-	return np.rad2deg(np.arctan2(det,dot))
+	return standardangle(np.rad2deg(np.arctan2(det,dot)))
 
 def drawpath(solution, camefrom):
 	try:
 		a = solution
-		b = camefrom[a]
+		draw_bicycle(solution[0],solution[1],0,color='green')
+		b,u = camefrom[a]
 		while True:
 			if b is None:
 				break
-			steer(b[0],b[1],a[0],a[1],plot=True)
+			draw_path_segment(b,a,u)
+			#steer(b[0],b[1],a[0],a[1],plot=True)
 			a = b # child
-			b = camefrom[b] # parent
-	except Exception as e:
-		print(e)
-		print(a)
+			b,u = camefrom[b] # parent
+	except TypeError as e:
+		pass	
 
+def drawtree(begin,graph,camefrom):
+	for parent in graph.keys():
+		for child in graph[parent]:
+			dummy,u = camefrom[child]
+			draw_path_segment(parent,child,u,colors={"left":"lightgray","right":"silver","straight":"silver","bike":"darkgray"},bikes=False)
+		if not graph[parent]:
+			draw_bicycle(parent[0],parent[1],0,color='darkgray')
+	
 def rrt(start,goal):
 	# Set up start, goal, tree, and parent map
 	start = (start[0],standardangle(start[1]))
@@ -145,7 +154,7 @@ def rrt(start,goal):
 		G[qnear].append(qnew) # add edge
 
 		if qnew != qnear:
-			cameFrom[qnew] = qnear
+			cameFrom[qnew] = (qnear,u)
 
 		# Compute angle difference between goal and qnew
 		r1 = R.from_euler('z', qnew[1], degrees=True)
@@ -165,7 +174,7 @@ def rrt(start,goal):
 
 	return sol,G,cameFrom
 
-def draw_path_segment(bike1,bike2,u):
+def draw_path_segment(bike1,bike2,u,colors={"left":"magenta","right":"dodgerblue","straight":"red","bike":"blue"},bikes=True):
 	""" Draw the path segment passed in to this function
 		Useful so that we can only visualize non-culled candidates in rrt()
 	"""
@@ -194,10 +203,10 @@ def draw_path_segment(bike1,bike2,u):
 			steerangle = steerangle+180
 			flip = True
 
-		color='lime'
+		color=colors["left"]
 		if  u[0]<-0: #right left coloring
 			# if you want to make it color based on backward/forward, use ((u[0]>90) or (u[0]<-90)):
-			color='cyan'
+			color=colors["right"]
 		
 		if u[0]<0 or flip:
 			arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle, theta1=0, theta2=-angle3,edgecolor=color,linestyle='--')
@@ -207,10 +216,11 @@ def draw_path_segment(bike1,bike2,u):
 		ax.add_patch(arc)
 	
 	else:
-		plt.plot([bike1[0][0],bike2[0][0]],[bike1[0][1],bike2[0][1]],linestyle='--',color='red')
+		plt.plot([bike1[0][0],bike2[0][0]],[bike1[0][1],bike2[0][1]],linestyle='--',color=colors["straight"])
 	
-	draw_bicycle(bike1[0],bike1[1],u[0],color='blue')
-	#draw_bicycle(bike2[0],bike2[1],0,color='blue')
+	if bikes:
+		draw_bicycle(bike1[0],bike1[1],u[0],color=colors["bike"])
+		#draw_bicycle(bike2[0],bike2[1],0,color='blue')
 
 def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 	""" Steer the bike towards the bikegoal in a single step attempt
@@ -317,8 +327,15 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 		angle3 = anglebetween(icc_to_goalbike,icc_to_originbike)
 
 		# Compute the length of the path to be travelled
-		traveldist = angle_to_arclength(rad,abs(angle3))
-		if angle3<0: traveldist = angle_to_arclength(rad,360-abs(angle3))	
+		r1 = R.from_euler('z',angle,degrees=True)
+		r2 = R.from_euler('z',angle2,degrees=True)
+		diff = r1.inv()*r2
+		diff = diff.as_euler('xyz')[2]
+		arcangle = np.rad2deg(diff)
+		if flip or steerangle<0:
+			if arcangle>0:
+				arcangle = 360-arcangle
+		traveldist = angle_to_arclength(rad,arcangle)	
 		# If that length is more than allowed, update target point
 		if traveldist > builtins.maxdrivedist:
 			maxdriveangle = arclength_to_angle(rad,builtins.maxdrivedist)
@@ -330,6 +347,7 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 			goal_point = maxrot.apply([icc_to_originbike[0],icc_to_originbike[1],0])
 			goal_point = np.add(goal_point[:2],intersection)
 			icc_to_goalbike = np.subtract(goal_point,intersection)
+			#if plot: plt.scatter(goal_point[0],goal_point[1],color='lime')
 
 			# Compute the angle of goal bike, origin bike, and angle between the two
 			angle = anglebetween([1,0],icc_to_goalbike)
@@ -341,12 +359,13 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 			final_vec = R.from_euler('z', -c_ccw, degrees=True).apply(final_vec)
 			final_vec=final_vec[:2]
 			final_angle = -anglebetween([1,0],final_vec)
-
+	
 		# If plot=True, draw this path
 		color='magenta'
 		if flip:
 			color='blue'
-		if plot and not ((steerangle<LEFTCONSTRAINT) or (steerangle>RIGHTCONSTRAINT)): 
+
+		if plot: 
 			if flip or steerangle<0:
 				arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle, theta1=0, theta2=-angle3,edgecolor=color,linestyle='--')
 			else:

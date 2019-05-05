@@ -20,12 +20,12 @@ builtins.LEFTCONSTRAINT = -45
 builtins.RIGHTCONSTRAINT = 45
 
 # RRT parameters
-builtins.K=1000 # Number of vertices in the tree
+builtins.K=100 # Number of vertices in the tree
 builtins.showtree = False
 builtins.maxdrivedist = 10 # Max steering arclength/straight line distance to drive
 builtins.tol_xy = 5 # tolerance for goal xy
 builtins.tol_ang = 15 # tolerance for final angle to goal angle
-builtins.weightxy = .8 # Mix between target xy and angle in steer(). Angle weight is the complement
+builtins.weightxy = .7 # Mix between target xy and angle in steer(). Angle weight is the complement
 builtins.xystdv = 0.01 # Stddev for normal dist of xy position in rand_conf()
 builtins.anglestdv = 10 # Stddev for normal dist of angle in rand_conf()
 
@@ -52,10 +52,15 @@ if __name__ == "__main__":
 	
 	# Run an RRT
 	begin = ((20,20),rrt.standardangle(0))
-	end = ((60,25),rrt.standardangle(170))
+	end = ((100,50),rrt.standardangle(90))
 
 	solution,graph,camefrom = rrt.rrt( begin , end )
-	rrt.drawpath(solution,camefrom)
+	if solution is not None:
+		rrt.drawpath(solution,camefrom)
+	else:
+		print("Didn't find solution")
+		rrt.drawtree(begin,graph,camefrom)
+
 	rrt.draw_bicycle(begin[0],begin[1],0,color='red')
 	rrt.draw_bicycle(end[0],end[1],0,color='lime')
 
