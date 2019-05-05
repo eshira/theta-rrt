@@ -69,6 +69,12 @@ def rand_conf(mean):
 def arclength_to_angle(radius, arclength):
 	return arclength*360/(np.pi*2*radius)
 
+def anglebetween(vec1,vec2):
+	# Compute the angle between to vectors
+	dot = np.dot(vec1[:2],vec2)
+	det = vec2[0]*vec1[1]-vec1[0]*vec2[1]
+	return np.rad2deg(np.arctan2(det,dot))
+
 def drawpath(solution, camefrom):
 	try:
 		a = solution
@@ -182,20 +188,20 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 
 	# Find the vector of the bike frame
 	bikeframe = [bikelength,0,0]
-	r = R.from_euler('z', theta, degrees=True)
-	bikeframe = r.apply(bikeframe)
+	r_theta = R.from_euler('z', theta, degrees=True)
+	bikeframe = r_theta.apply(bikeframe)
 	
 	# Rotate both vectors yielding the perp bisector and the normal of the bike
-	r = R.from_euler('z', 90, degrees=True)
-	bikeframe = r.apply(bikeframe)
-	bisector = r.apply(bisector)
+	r_90 = R.from_euler('z', 90, degrees=True)
+	bikenormal = r_90.apply(bikeframe)
+	perpbisector = r_90.apply(bisector)
 	
 	# Attempt to solve for the ICC
 	# (singular matrix exception will mean straight line driving)
 	try:	
 		# Convert to matrix form
-		a1,b1,c1=linefrompoints(midpoint,np.add(midpoint,bisector[:2]))
-		a2,b2,c2=linefrompoints(bikeorigin,np.add(bikeorigin,bikeframe[:2]))
+		a1,b1,c1=linefrompoints(midpoint,np.add(midpoint,perpbisector[:2]))
+		a2,b2,c2=linefrompoints(bikeorigin,np.add(bikeorigin,bikenormal[:2]))
 		a = np.array([[a1,b1],[a2,b2]])
 		b = np.array([c1,c2])
 
@@ -208,37 +214,18 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 		# Compute the turn radius
 		rad = np.linalg.norm(np.subtract(bikeorigin,intersection))
 
-		# Draw the bike frame and direction theta
-		bikeframe = [bikelength,0,0]
-		r = R.from_euler('z', theta, degrees=True)
-		bikeframe = r.apply(bikeframe)
-		x = bikeorigin[0]
-		y = bikeorigin[1]
-		pivot = (bikeframe[0]+x,bikeframe[1]+y)
-
+		# Find the steering angle
+		pivot = np.add(bikeframe[:2],bikeorigin)
 		steervector = np.subtract(pivot,intersection)
 		steervector = [steervector[0],steervector[1],0]
-		r = R.from_euler('z', 90, degrees=True)
-		steervector = r.apply(steervector)
-
+		steervector = r_90.apply(steervector)
 		steervector=steervector[:2]
-		bikeframe = bikeframe[:2]
-		dot = np.dot(bikeframe,steervector)
-		det = steervector[0]*bikeframe[1]-bikeframe[0]*steervector[1]
-		steerangle = -np.rad2deg(np.arctan2(det,dot))
+		steerangle = standardangle(-anglebetween(bikeframe[:2],steervector))
 		
-		# positive steer is right
-		# if steering right, point to ICC, turn left 90
-		# if steering left, point to ICC, turn rigt
-		final_angle = np.subtract(bikegoal,intersection)
-		final_angle = [final_angle[0],final_angle[1],0]
-		
-		steerangle = standardangle(steerangle)
-
 		flip=False
 
-		# If the bicycle is trying to steer backwards, we don't let it; ought to try the path forward
-		# TO DO: find out which is the longer path and choose that if FORWARDONLY is false
+		# If FORWARDONLY, flip any backwards steering
+		# TO DO: if FORWARDONLY is false choose between forward or backwards based on length
 		if builtins.FORWARDONLY and ((steerangle>90) or (steerangle<-90)):
 			steerangle = steerangle+180
 			steerangle = standardangle(steerangle)
@@ -247,109 +234,68 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 		c_ccw = 0
 		# Front Right and Back left steering case
 		if ((steerangle >= 0) and (steerangle <90)) or ((steerangle <= -90) and (steerangle > -180)):
-			r = R.from_euler('z', 90, degrees=True)
 			c_ccw = -90
 		# Front left and back right
 		else:
-			r = R.from_euler('z',-90,degrees=True)
 			c_ccw = 90
 
-		final_angle = r.apply(final_angle)
-		final_angle=final_angle[:2]
-		
-		testvec = [1,0]
-		dot = np.dot(testvec,final_angle)
-		det = final_angle[0]*testvec[1]-testvec[0]*final_angle[1]
-		final_angle = -np.rad2deg(np.arctan2(det,dot))
-		
-		# First mix point in RED
-		mix = builtins.weightxy*standardangle(final_angle) + (1-builtins.weightxy)*standardangle(thetagoal)
-		vec2 = [1,0,0]
-		thetagoal2 = (mix)+c_ccw
-		r2 = R.from_euler('z',thetagoal2,degrees=True)
-		vec2 = r2.apply(vec2)
-		# Normalize that vector and make it length radius
-		vec2 = rad*vec2/np.linalg.norm(vec2)
-		vec2 = vec2[:2]
-		mix1 = vec2
-		# The point that it lands on achieves the angle.
-		#plt.scatter(mix1[0]+intersection[0],mix1[1]+intersection[1],color='red')
+		""" Find the final angle of the bike if it were to drive to the xy goal along this path
+			Note that positive steering angle means steering to the right
+			if steering right, point to the ICC and then turn left 90
+			if steering left, point to the ICC, and then turn right
+		"""
+		final_vec = np.subtract(bikegoal,intersection)
+		final_vec = [final_vec[0],final_vec[1],0]
+		final_vec = R.from_euler('z', -c_ccw, degrees=True).apply(final_vec)
+		final_vec=final_vec[:2]
+		final_angle = -anglebetween([1,0],final_vec)
 
+		# Find the objective point and angle that is a mix between origin target xy and target angle
+		mix_angle = builtins.weightxy*standardangle(final_angle) + (1-builtins.weightxy)*standardangle(thetagoal)
+		thetagoal2 = (mix_angle)+c_ccw
+		mix_point = R.from_euler('z',thetagoal2,degrees=True).apply([1,0,0])[:2]
+		mix_point = rad*mix_point/np.linalg.norm(mix_point)
+		mix_point = np.add(intersection,mix_point)
+		goal_point = mix_point
+
+		# Vector pointing from ICC to origin bike
 		icc_to_originbike = np.subtract(bikeorigin,intersection)
-		icc_to_originbike = icc_to_originbike/np.linalg.norm(icc_to_originbike)
-		
-		mix = builtins.weightxy*standardangle(final_angle) + (1-builtins.weightxy)*standardangle(thetagoal)
-		mix = standardangle(mix)
-		
-		# The point that it lands on achieves the angle.
-		goalanglept = np.add(intersection,mix1)
 
-		icc_to_goalbike = np.subtract(goalanglept,intersection)
-		icc_to_goalbike = icc_to_goalbike /np.linalg.norm(icc_to_goalbike )
-		
-		dot = np.dot(np.array([1,0]),icc_to_goalbike)
-		det = icc_to_goalbike[0]*0-1*icc_to_goalbike[1]
+		# Vector pointing from ICC to target bike
+		icc_to_goalbike = np.subtract(mix_point,intersection)
 
-		dot2 = np.dot(np.array([1,0]),icc_to_originbike)
-		det2 = icc_to_originbike[0]*0-1*icc_to_originbike[1]
+		# Compute the angle of goal bike, origin bike, and angle between the two
+		angle = anglebetween([1,0],icc_to_goalbike)
+		angle2 = anglebetween([1,0],icc_to_originbike)
+		angle3 = anglebetween(icc_to_goalbike,icc_to_originbike)
 
-		dot3 = np.dot(icc_to_goalbike,icc_to_originbike)
-		det3 = icc_to_originbike[0]*icc_to_goalbike[1]-icc_to_goalbike[0]*icc_to_originbike[1]
-
-		angle = np.rad2deg(np.arctan2(det,dot))
-		angle2 = np.rad2deg(np.arctan2(det2,dot2))
-		angle3 = np.rad2deg(np.arctan2(det3,dot3))
-
-		# Compare arclength of origin to goal to max arclength param
+		# Compute the length of the path to be travelled
 		traveldist = angle_to_arclength(rad,abs(angle3))
-		if angle3<0:
-			traveldist = angle_to_arclength(rad,360-abs(angle3))		
+		if angle3<0: traveldist = angle_to_arclength(rad,360-abs(angle3))	
+		# If that length is more than allowed, update target point
 		if traveldist > builtins.maxdrivedist:
-			icc_to_originbike=icc_to_originbike*rad
 			maxdriveangle = arclength_to_angle(rad,builtins.maxdrivedist)
 			if steerangle<0:
 				maxrot = R.from_euler('z',-maxdriveangle,degrees=True)
-				# get the vector to the start bike. based on steer, rotate appropriately.
-				landing = maxrot.apply([icc_to_originbike[0],icc_to_originbike[1],0])
-				landing=np.add(landing[:2],intersection)
-				#if plot: plt.scatter(landing[0],landing[1],color='red')
-				#plt.scatter(intersection[0],intersection[1],color='lime')
 			else:
 				maxrot = R.from_euler('z',maxdriveangle,degrees=True)
-				# get the vector to the start bike. based on steer, rotate appropriately.
-				landing = maxrot.apply([icc_to_originbike[0],icc_to_originbike[1],0])
-				landing=np.add(landing[:2],intersection)
-				#if plot: plt.scatter(landing[0],landing[1],color='blue')
+			# get the vector to the start bike. based on steer, rotate appropriately.
+			goal_point = maxrot.apply([icc_to_originbike[0],icc_to_originbike[1],0])
+			goal_point = np.add(goal_point[:2],intersection)
+			icc_to_goalbike = np.subtract(goal_point,intersection)
 
-			goalanglept = landing
+			# Compute the angle of goal bike, origin bike, and angle between the two
+			angle = anglebetween([1,0],icc_to_goalbike)
+			angle2 = anglebetween([1,0],icc_to_originbike)
+			angle3 = anglebetween(icc_to_goalbike,icc_to_originbike)
 
-			icc_to_goalbike = np.subtract(goalanglept,intersection)
-			icc_to_goalbike = icc_to_goalbike /np.linalg.norm(icc_to_goalbike )
-			
-			dot = np.dot(np.array([1,0]),icc_to_goalbike)
-			det = icc_to_goalbike[0]*0-1*icc_to_goalbike[1]
+			final_vec = np.subtract(goal_point,intersection)
+			final_vec = [final_vec[0],final_vec[1],0]
+			final_vec = R.from_euler('z', -c_ccw, degrees=True).apply(final_vec)
+			final_vec=final_vec[:2]
+			final_angle = -anglebetween([1,0],final_vec)
 
-			dot2 = np.dot(np.array([1,0]),icc_to_originbike)
-			det2 = icc_to_originbike[0]*0-1*icc_to_originbike[1]
-
-			dot3 = np.dot(icc_to_goalbike,icc_to_originbike)
-			det3 = icc_to_originbike[0]*icc_to_goalbike[1]-icc_to_goalbike[0]*icc_to_originbike[1]
-
-			angle = np.rad2deg(np.arctan2(det,dot))
-			angle2 = np.rad2deg(np.arctan2(det2,dot2))
-			angle3 = np.rad2deg(np.arctan2(det3,dot3))
-
-			final_angle = np.subtract(goalanglept,intersection)
-			final_angle = [final_angle[0],final_angle[1],0]
-			final_angle = r.apply(final_angle)
-			final_angle=final_angle[:2]
-		
-			testvec = [1,0]
-			dot = np.dot(testvec,final_angle)
-			det = final_angle[0]*testvec[1]-testvec[0]*final_angle[1]
-			final_angle = -np.rad2deg(np.arctan2(det,dot))
-			mix = final_angle
-
+		# If plot=True, draw this path
 		color='magenta'
 		if flip:
 			color='blue'
@@ -361,25 +307,24 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 
 			ax.add_patch(arc)
 			#draw_bicycle(bikeorigin,theta,steerangle,color='cyan')
-			draw_bicycle(goalanglept,mix,0,color='blue')			
+			draw_bicycle(goal_point,final_angle,0,color='blue')			
 
 		# Return the final bike state and useful info relating to u, the controls
-		return (goalanglept,mix),(steerangle,intersection,rad)
+		return (goal_point,final_angle),(steerangle,intersection,rad)
 
 	except np.linalg.LinAlgError as e: # Singular matrix; straight line driving
-		vector = np.subtract(bikegoal,bikeorigin) # point from bikeorigin to bikegoal
-		
+		vector = np.subtract(bikegoal,bikeorigin) # points from bikeorigin to bikegoal
 		if(np.linalg.norm(vector)>0.000001): #if you can normalize it
 			stepvector = builtins.maxdrivedist*vector/np.linalg.norm(vector)
 			if np.linalg.norm(stepvector) > np.linalg.norm(vector):
-			# just go to the the goal, otherwise overshoot
+			# You can reach the goal, so go to that
 				pass
 			else:
-				# go as far as allowed
+				# Go as far as you can, falling short of goal
 				bikegoal = np.add(bikeorigin,stepvector)
 		
 		if plot:
 			plt.plot([bikeorigin[0],bikegoal[0]],[bikeorigin[1],bikegoal[1]],linestyle='--',color='pink')
 			draw_bicycle(bikegoal,thetagoal,0,color='blue')
+
 		return (bikegoal,theta),(0, None,None)
-		#return theta,0

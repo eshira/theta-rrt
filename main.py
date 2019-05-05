@@ -52,7 +52,7 @@ if __name__ == "__main__":
 	
 	# Run an RRT
 	begin = ((20,20),rrt.standardangle(0))
-	end = ((20,35),rrt.standardangle(170))
+	end = ((60,55),rrt.standardangle(170))
 
 	solution,graph,camefrom = rrt.rrt( begin , end )
 
