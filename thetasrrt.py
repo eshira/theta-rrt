@@ -11,13 +11,14 @@ from scipy.spatial.transform import Rotation as R # for consistently doing rotat
 
 THETASTAR = True # can turn off or on
 stepsize = 10 # specify arclength for steps
-tol = 5 # tolerance for goal xy
+tol = 15 # tolerance for goal xy
 tolang = 25 # tolerance for final angle to goal angle
-xydev = 0.05 # multiplier (times image dimensions) for standard deviation for normal dist for xy goal biasing
+xydev = 0.01 # multiplier (times image dimensions) for standard deviation for normal dist for xy goal biasing
 # Relative weighting between xy and angle
-weightxy = .9 # The weight for the angle will be the complement
-maxdrivedist = 30
-K=1000 # Number of vertices in the tree
+weightxy = .8 # The weight for the angle will be the complement
+maxdrivedist = 10
+K=100 # Number of vertices in the tree
+showtree=True # whether to try and graph tau, the tree. be careful with big k
 
 bikelength = 5 # Specify the bike frame length
 LEFTCONSTRAINT = -45
@@ -282,8 +283,9 @@ def rrt(start,goal):
 		index = np.argmin([L2norm(item[0],qrand[0]) for item in keys])
 		qnear = keys[index]
 		
-		qdrive,u = steer(qnear[0], qnear[1], qrand[0], qrand[1],plot=False)
-		qnew = ((int(qdrive[0][0]),int(qdrive[0][1])),qdrive[1])
+		qdrive,u = steer(qnear[0], qnear[1], qrand[0], qrand[1],plot=showtree)
+		qnew = ((qdrive[0][0],qdrive[0][1]),qdrive[1])
+		#qnew = ((int(qdrive[0][0]),int(qdrive[0][1])),qdrive[1])
 
 		finalang = qdrive[1]
 		steerang = u[0]
@@ -363,10 +365,10 @@ def draw_bicycle(bike_loc,theta,alpha,color='blue'):
 
 def draw_path(bike1,bike2,u):
 	# u = (0,arclength, intersection,rad)
-	intersection = u[2]
+	intersection = u[1]
 
 	if intersection is not None:
-		rad = u[3]
+		rad = u[2]
 
 		icc_to_bike2 = np.subtract(bike2[0],intersection)
 		icc_to_bike2 = icc_to_bike2 /np.linalg.norm(icc_to_bike2)
@@ -552,6 +554,8 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 
 		# Compare arclength of origin to goal to max arclength param
 		traveldist = angle_to_arclength(rad,abs(angle3))
+		if angle3<0:
+			traveldist = angle_to_arclength(rad,360-abs(angle3))		
 		if traveldist > maxdrivedist:
 			icc_to_originbike=icc_to_originbike*rad
 			maxdriveangle = arclength_to_angle(rad,maxdrivedist)
@@ -601,27 +605,35 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 		color='magenta'
 		if flip:
 			color='blue'
-		if plot:
+		if plot and not ((steerangle<LEFTCONSTRAINT) or (steerangle>RIGHTCONSTRAINT)): 
 			if flip or steerangle<0:
 				arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle, theta1=0, theta2=-angle3,edgecolor=color,linestyle='--')
 			else:
 				arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle2, theta1=0, theta2=angle3,edgecolor=color,linestyle='--')
 
 			ax.add_patch(arc)
-			draw_bicycle(bikeorigin,theta,steerangle,color='cyan')
+			#draw_bicycle(bikeorigin,theta,steerangle,color='cyan')
 			draw_bicycle(goalanglept,mix,0,color='blue')			
 
-		arclength = 0 # dummy placeholder for now
 		# Return the final bike state and useful info relating to u, the controls
-		return (goalanglept,mix),(steerangle,arclength,intersection,rad)
+		return (goalanglept,mix),(steerangle,intersection,rad)
 
 	except np.linalg.LinAlgError as e: # Singular matrix; straight line driving
-		if plot: print('here')
-		arclength = 0 # dummy placeholder for now
+		vector = np.subtract(bikegoal,bikeorigin) # point from bikeorigin to bikegoal
+		
+		if(np.linalg.norm(vector)>0.000001): #if you can normalize it
+			stepvector = maxdrivedist*vector/np.linalg.norm(vector)
+			if np.linalg.norm(stepvector) > np.linalg.norm(vector):
+			# just go to the the goal, otherwise overshoot
+				pass
+			else:
+				# go as far as allowed
+				bikegoal = np.add(bikeorigin,stepvector)
+		
 		if plot:
 			plt.plot([bikeorigin[0],bikegoal[0]],[bikeorigin[1],bikegoal[1]],linestyle='--',color='pink')
 			draw_bicycle(bikegoal,thetagoal,0,color='blue')
-		return (bikegoal,theta),(0,arclength, None,None)
+		return (bikegoal,theta),(0, None,None)
 		#return theta,0
 
 def arclength_to_angle(radius, arclength):
@@ -671,7 +683,7 @@ else:
 	pass
 
 begin = ((20,20),standardangle(0))
-end = ((105,105),standardangle(10))
+end = ((20,35),standardangle(170))
 
 solution,graph,camefrom = rrt( begin , end )
 
