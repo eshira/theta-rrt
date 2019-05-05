@@ -119,7 +119,7 @@ def rrt(start,goal):
 		qnear = keys[index]
 		
 		# Try to drive there
-		qdrive,u = steer(qnear[0], qnear[1], qrand[0], qrand[1],plot=builtins.showtree)
+		qdrive,u = steer(qnear[0], qnear[1], qrand[0], qrand[1])
 		qnew = ((qdrive[0][0],qdrive[0][1]),qdrive[1])
 
 		""" Skip if not valid for any reason """
@@ -139,8 +139,8 @@ def rrt(start,goal):
 		if not (qnew in G.keys()):
 			G[qnew] = [] # vertex
 
-		# Uncomment if you want to draw the tree
-		#draw_path(qnear,qdrive,u)
+		if builtins.showtree:
+			draw_path_segment(qnear,qdrive,u)
 
 		G[qnear].append(qnew) # add edge
 
@@ -164,6 +164,53 @@ def rrt(start,goal):
 	print("Nodes in tree: ",len(G.keys()))
 
 	return sol,G,cameFrom
+
+def draw_path_segment(bike1,bike2,u):
+	""" Draw the path segment passed in to this function
+		Useful so that we can only visualize non-culled candidates in rrt()
+	"""
+	intersection = u[1]
+	if intersection is not None:
+		rad = u[2]
+		icc_to_bike2 = np.subtract(bike2[0],intersection)
+		icc_to_bike1 = np.subtract(bike1[0],intersection)
+		
+		# Compute the angle of goal bike, origin bike, and angle between the two
+		angle = anglebetween([1,0],icc_to_bike2)
+		angle2 = anglebetween([1,0],icc_to_bike1)
+		angle3 = anglebetween(icc_to_bike2,icc_to_bike1)
+
+		# Compute the steering angle
+		bikeframe = [bikelength,0,0]
+		bikeframe = R.from_euler('z', bike1[1], degrees=True).apply(bikeframe)
+		pivot = np.add(bikeframe[:2],bike1[0])
+		steervector = np.subtract(pivot,intersection)
+		steervector = [steervector[0],steervector[1],0]
+		steervector = R.from_euler('z', 90, degrees=True).apply(steervector)
+		steerangle = standardangle(-anglebetween(bikeframe[:2],steervector[:2]))
+		
+		flip=False
+		if FORWARDONLY and ((steerangle>90) or (steerangle<-90)):
+			steerangle = steerangle+180
+			flip = True
+
+		color='lime'
+		if  u[0]<-0: #right left coloring
+			# if you want to make it color based on backward/forward, use ((u[0]>90) or (u[0]<-90)):
+			color='cyan'
+		
+		if u[0]<0 or flip:
+			arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle, theta1=0, theta2=-angle3,edgecolor=color,linestyle='--')
+		else:
+			arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle2, theta1=0, theta2=angle3,edgecolor=color,linestyle='--')
+
+		ax.add_patch(arc)
+	
+	else:
+		plt.plot([bike1[0][0],bike2[0][0]],[bike1[0][1],bike2[0][1]],linestyle='--',color='red')
+	
+	#draw_bicycle(bike1[0],bike1[1],u[0],color='red')
+	draw_bicycle(bike2[0],bike2[1],0,color='blue')
 
 def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 	""" Steer the bike towards the bikegoal in a single step attempt

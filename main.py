@@ -26,8 +26,8 @@ builtins.maxdrivedist = 10 # Max steering arclength/straight line distance to dr
 builtins.tol_xy = 15 # tolerance for goal xy
 builtins.tol_ang = 25 # tolerance for final angle to goal angle
 builtins.weightxy = .8 # Mix between target xy and angle in steer(). Angle weight is the complement
-builtins.xystdv = 0.01 # Stddev for normal dist of xy position in rand_conf()
-builtins.anglestdv = 5 # Stddev for normal dist of angle in rand_conf()
+builtins.xystdv = 0.02 # Stddev for normal dist of xy position in rand_conf()
+builtins.anglestdv = 10 # Stddev for normal dist of angle in rand_conf()
 
 # Main
 if __name__ == "__main__":
