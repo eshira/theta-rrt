@@ -102,7 +102,10 @@ def getCirclePoints(xc,yc,p,q):
 				pixels.append(pixel)
 	return pixels
 
-def getCircle(xc,yc,r,draw=False):
+def getCircle(center,r,draw=False):
+	xc = int(center[0])
+	yc = int(center[1])
+	r = int(r)
 	x = r
 	y = 0
 	d = 1 - r
@@ -133,7 +136,50 @@ def getCircle(xc,yc,r,draw=False):
 				pixels.append(item)
 	if draw:
 		for item in pixels:
-			builtins.imarray[item[0],item[1]]=0
+			builtins.imarray[item[1],item[0]]=0
+	return pixels
+
+def getArc(begin,land,u,draw=False):
+	if u[1] is None: # you tried to draw an arc for a straight line
+		# To do, return the straight line with the line drawing algo
+		return False
+	else:
+		# Get the full circle reprsented by pixels
+		pixels = getCircle(u[1],u[2])
+		# Compute the angles to the beginning and end of the arc
+		beginangle = rrt.anglebetween([1,0],np.subtract(begin[0],u[1]))
+		endangle = rrt.anglebetween([1,0],np.subtract(land[0],u[1]))
+		if u[0]<0: # left turn case (CCW)
+			diff = rrt.anglediff(beginangle,endangle)
+		else: # right turn case (CW)
+			diff = rrt.anglediff(endangle,beginangle)
+			if diff<0:
+				diff = 360+diff
+
+		remaining = []
+		# For every circle pixel, figure out if you need to keep it
+		for item in pixels:
+			# Angle to this pixel
+			pxangle = rrt.anglebetween([1,0],np.subtract(item,u[1]))
+			if u[0]>0:
+				forwardofbegin = rrt.anglediff(pxangle,beginangle)
+				backwardofgoal = rrt.anglediff(endangle,pxangle)
+			else:
+				forwardofbegin = rrt.anglediff(beginangle,pxangle)
+				backwardofgoal = rrt.anglediff(pxangle,endangle)
+			if diff<180:
+				if (forwardofbegin >= 0) and (backwardofgoal>=0):
+					include=True
+				else:
+					include=False
+			else:
+				if (forwardofbegin >= 0) or (backwardofgoal>=0):
+					include=True
+				else:
+					include=False
+			if include:
+				remaining.append(item)
+				if draw: builtins.imarray[item[1],item[0]]=0
 
 def getneighbors(node):
 	listofneighbors = []

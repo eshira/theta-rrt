@@ -99,7 +99,7 @@ def drawtree(begin,graph,camefrom):
 			draw_bicycle(parent[0],parent[1],0,color='darkgray')
 
 def anglediff(angle1,angle2):
-	# Compute angle difference between goal and qnew
+	# Compute angle difference between angle1 and angle2
 	r1 = R.from_euler('z', angle1, degrees=True)
 	r2 = R.from_euler('z', angle2, degrees=True)
 	diff = r1.inv()*r2
@@ -452,13 +452,13 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 
 		if plot: 
 			if flip or steerangle<0:
-				arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle, theta1=0, theta2=-angle3,edgecolor=color,linestyle='--')
+				arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle, theta1=0, theta2=-angle3,edgecolor=color,linestyle='--',zorder=10)
 			else:
-				arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle2, theta1=0, theta2=angle3,edgecolor=color,linestyle='--')
+				arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle2, theta1=0, theta2=angle3,edgecolor=color,linestyle='--',zorder=10)
 
 			ax.add_patch(arc)
 			draw_bicycle(bikeorigin,theta,steerangle,color='cyan')
-			#draw_bicycle(goal_point,final_angle,0,color='blue')			
+			draw_bicycle(goal_point,final_angle,0,color='blue')			
 
 		# Return the final bike state and useful info relating to u, the controls
 		return (goal_point,final_angle),(steerangle,intersection,rad)
