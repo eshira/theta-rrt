@@ -4,6 +4,7 @@ from main import *
 from scipy.spatial.transform import Rotation as R # for consistently doing rotations
 import search
 import matplotlib.patches as patches # for drawing arcs and circles
+import itertools
 
 def standardangle(angle):
 	while angle >180:
@@ -84,10 +85,12 @@ def drawpath(solution, camefrom):
 			if b is None:
 				break
 			draw_path_segment(b,a,u)
-			pixels = search.getArc(b[0],a[0],u)
-			for item in pixels:
+			#pixels = search.getArc(b[0],a[0],u)
+			if front_of_bike_clear(a,plot=False):
+				front_of_bike_clear(a,plot=True)
+			#for item in pixels:
 				#builtins.imarray[item[1]][item[0]]=0
-				plt.scatter(item[0],item[1],s=10,color='blue')
+				#plt.scatter(item[0],item[1],s=10,color='blue')
 			#steer(b[0],b[1],a[0],a[1],plot=True)
 			a = b # child
 			b,u = camefrom[b] # parent
@@ -166,6 +169,14 @@ def rrt(start,goal,debug=False):
 		if (not search.valid(qnew[0])):
 			if debug: print('Qnew out of bounds')
 			continue
+		# Reason: bike intersects obstacles
+		if not bike_clear(qnew):
+			if debug: print('Bike does not clear obstacles')
+			continue
+		# Reason: front of bike too close to obstacles
+		if not front_of_bike_clear(qnew):
+			if debug: print('Front of bike not clear')
+			continue	
 		# Reason: Path runs into obstacles
 		pixels = search.getArc(qnear[0],qnew[0],u)
 		if False in [search.freespace(px) for px in pixels]:
@@ -201,6 +212,65 @@ def rrt(start,goal,debug=False):
 	print("Nodes in tree: ",len(G.keys()))
 
 	return sol,G,cameFrom
+
+def bike_clear(bike):
+	bikeframe = [bikelength,0,0]
+	bikeframe = R.from_euler('z', bike[1], degrees=True).apply(bikeframe)
+	pivot = np.add(bikeframe[:2],bike[0])
+	pivot = (int(pivot[0]),int(pivot[1]))
+	return search.lineofsight(bike[0],pivot)
+
+def front_of_bike_clear(bike,plot=False):
+	bikeframe = [bikelength*builtins.frontclearance,0,0]
+	bikeframe = R.from_euler('z', bike[1], degrees=True).apply(bikeframe)
+	pivot = np.add(bikeframe[:2],bike[0])
+	pivot=(int(pivot[0]),int(pivot[1]))
+	test = search.lineofsight(bike[0],pivot)
+	if test==False: return False
+	return True
+	"""
+	testbike = (bike[0][0]+1,bike[0][1])
+	pivot1 = np.add(bikeframe[:2],testbike)
+	pivot1 = (int(pivot[0]),int(pivot[1]))
+	test = search.lineofsight(testbike,pivot)
+	if test==False: return False
+
+	testbike = (bike[0][0]-1,bike[0][1])
+	pivot1 = np.add(bikeframe[:2],testbike)
+	pivot1 = (int(pivot[0]),int(pivot[1]))
+	test = search.lineofsight(testbike,pivot)
+	if test==False: return False
+
+	testbike = (bike[0][0],bike[0][1]+1)
+	pivot1 = np.add(bikeframe[:2],testbike)
+	pivot1 = (int(pivot[0]),int(pivot[1]))
+	test = search.lineofsight(testbike,pivot)
+	if test==False: return False
+
+	testbike = (bike[0][0],bike[0][1]+1)
+	pivot1 = np.add(bikeframe[:2],testbike)
+	pivot1 = (int(pivot[0]),int(pivot[1]))
+	test = search.lineofsight(testbike,pivot)
+	if test==False: return False
+
+	return True
+	"""
+	#
+
+	#return search.lineofsight(bike[0],pivot)
+	"""
+	result = True
+	bikeframe = [bikelength,0,0]
+	bikeframe = R.from_euler('z', bike[1], degrees=True).apply(bikeframe)
+	pivot = np.add(bikeframe[:2],bike[0])
+	pivot = (int(pivot[0]),int(pivot[1]))
+	check = [(pivot[0]+p[0],pivot[1]+p[1]) for p in itertools.product([-1,0,1],repeat=2)]
+	for item in check:
+		if not search.freespace(item):
+			result = False
+			break
+	return result
+	"""
 
 def draw_path_segment(bike1,bike2,u,colors={"left":"magenta","right":"dodgerblue","straight":"red","bike":"dodgerblue"},bikes=True):
 	""" Draw the path segment passed in to this function

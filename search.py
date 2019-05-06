@@ -25,6 +25,8 @@ def valid(node):
 
 def freespace(node):
 	# True if freespace, False if obstacle
+	if not valid(node):
+		return False # annoying otherwise
 	if imarray[int(node[1])][int(node[0])]:
 		return True
 	else:
@@ -152,9 +154,8 @@ def getArc(begin,land,u):
 			diff = rrt.anglediff(beginangle,endangle)
 		else: # right turn case (CW)
 			diff = rrt.anglediff(endangle,beginangle)
-			if diff<0:
-				diff = 360+diff
-
+		if diff<0:
+			diff = 360+diff
 		remaining = []
 		# For every circle pixel, figure out if you need to keep it
 		for item in pixels:
