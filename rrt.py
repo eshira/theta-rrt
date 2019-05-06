@@ -104,7 +104,7 @@ def anglediff(angle1,angle2):
 	r2 = R.from_euler('z', angle2, degrees=True)
 	diff = r1.inv()*r2
 	diff = diff.as_euler('xyz')[2]
-	diff = abs(np.rad2deg(diff))
+	diff = np.rad2deg(diff)
 	return diff
 
 def findnearest(tree,goal):
@@ -112,7 +112,7 @@ def findnearest(tree,goal):
 	nearest = (None,None)
 	for parent in tree.keys():
 		for child in tree[parent]:
-			distance = builtins.weightxy*search.L2norm(child[0],goal[0]) + (1-builtins.weightxy)*anglediff(child[1],goal[1])
+			distance = builtins.weightxy*search.L2norm(child[0],goal[0]) + (1-builtins.weightxy)*abs(anglediff(child[1],goal[1]))
 			if nearest==(None,None):				
 				nearest = (child,distance)
 			else:
@@ -300,8 +300,9 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 		steervector = r_90.apply(steervector)
 		steervector=steervector[:2]
 		steerangle = standardangle(-anglebetween(bikeframe[:2],steervector))
-		
+
 		flip=False
+		point_to_goal_only = False
 
 		# If FORWARDONLY, flip any backwards steering
 		# TO DO: if FORWARDONLY is false choose between forward or backwards based on length
@@ -309,7 +310,31 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 			steerangle = steerangle+180
 			steerangle = standardangle(steerangle)
 			flip = True
-	
+
+		
+		# If steering is past left or right constraint, limit it and turn along that radius
+		if (steerangle<builtins.LEFTCONSTRAINT) or (steerangle>builtins.RIGHTCONSTRAINT):
+			if (steerangle<builtins.LEFTCONSTRAINT):
+				steerangle = builtins.LEFTCONSTRAINT
+				# To get normal to front wheel, take bike normal and rotate it by the steer angle
+				frontnorm = R.from_euler('z',steerangle,degrees=True).apply(bikenormal)
+			if (steerangle>builtins.RIGHTCONSTRAINT):
+				steerangle = builtins.RIGHTCONSTRAINT
+				# To get normal to front wheel, take bike normal and rotate it by the steer angle
+				frontnorm = R.from_euler('z',steerangle,degrees=True).apply(bikenormal)
+			a1,b1,c1=linefrompoints(pivot,np.add(pivot,frontnorm[:2]))
+			a2,b2,c2=linefrompoints(bikeorigin,np.add(bikeorigin,bikenormal[:2]))
+			a = np.array([[a1,b1],[a2,b2]])
+			b = np.array([c1,c2])
+			intersection = np.linalg.solve(a,b)
+			if np.linalg.cond(a) > 1000000:
+				# Matrix is near singular
+				raise np.linalg.LinAlgError('Singular matrix')
+			# Compute the turn radius
+			rad = np.linalg.norm(np.subtract(bikeorigin,intersection))
+			point_to_goal_only = True
+
+		
 		c_ccw = 0
 		# Front Right and Back left steering case
 		if ((steerangle >= 0) and (steerangle <90)) or ((steerangle <= -90) and (steerangle > -180)):
@@ -331,17 +356,50 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 
 		# Find the objective point and angle that is a mix between origin target xy and target angle
 		mix_angle = builtins.weightxy*standardangle(final_angle) + (1-builtins.weightxy)*standardangle(thetagoal)
-		thetagoal2 = (mix_angle)+c_ccw
-		mix_point = R.from_euler('z',thetagoal2,degrees=True).apply([1,0,0])[:2]
-		mix_point = rad*mix_point/np.linalg.norm(mix_point)
-		mix_point = np.add(intersection,mix_point)
-		goal_point = mix_point
+		
+		#point_to_goal_only = False
+		# For cases where turning was limited by turn radius
+		if point_to_goal_only:
+			# Find the angle to the goal from bike origin point to bike goal point
+			mix_angle = anglebetween([1,0],np.subtract(bikegoal,bikeorigin))
 
+		thetagoal2 = (mix_angle)+c_ccw
+		mix_point1 = R.from_euler('z',thetagoal2,degrees=True).apply([1,0,0])[:2]
+		mix_point1 = rad*mix_point1/np.linalg.norm(mix_point1)
+		mix_point1 = np.add(intersection,mix_point1)
+
+		thetagoal3 = thetagoal2+180
+		mix_point2 = R.from_euler('z',thetagoal3,degrees=True).apply([1,0,0])[:2]
+		mix_point2 = rad*mix_point2/np.linalg.norm(mix_point2)
+		mix_point2= np.add(intersection,mix_point2)
+
+		diff1 = anglediff(anglebetween([1,0],np.subtract(mix_point1,intersection)),anglebetween([1,0],np.subtract(bikegoal,intersection)))
+		diff2 = anglediff(anglebetween([1,0],np.subtract(mix_point2,intersection)),anglebetween([1,0],np.subtract(bikegoal,intersection)))
+		final_angle = mix_angle
+
+		if abs(diff1)<abs(diff2):
+			#Pick original mix point
+			goal_point = mix_point1
+		else:
+			#Pick rotated mix point
+			goal_point = mix_point2
+			final_angle = standardangle(final_angle-180)
+
+		if point_to_goal_only:
+			goal_point = mix_point1
+			#if steerangle < 0:
+			#	final_angle = standardangle(final_angle+180)
+			final_vec = np.subtract(goal_point,intersection)
+			final_vec = [final_vec[0],final_vec[1],0]
+			final_vec = R.from_euler('z', -c_ccw, degrees=True).apply(final_vec)
+			final_vec=final_vec[:2]
+			final_angle = -anglebetween([1,0],final_vec)
+			#plt.scatter(intersection[0],intersection[1],color='red')
+
+		# Vector pointing from ICC to new target bike
+		icc_to_goalbike = np.subtract(goal_point,intersection)
 		# Vector pointing from ICC to origin bike
 		icc_to_originbike = np.subtract(bikeorigin,intersection)
-
-		# Vector pointing from ICC to target bike
-		icc_to_goalbike = np.subtract(mix_point,intersection)
 
 		# Compute the angle of goal bike, origin bike, and angle between the two
 		angle = anglebetween([1,0],icc_to_goalbike)
@@ -354,10 +412,15 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 		diff = r1.inv()*r2
 		diff = diff.as_euler('xyz')[2]
 		arcangle = np.rad2deg(diff)
-		if flip or steerangle<0:
-			if arcangle>0:
+
+		if steerangle>0: # CW driving, turning right
+			if arcangle<0: # CCW angle, so take complement
+				arcangle = 360+arcangle
+		else: # CCW driving, turning left
+			if arcangle>0: #CW angle, so take complement
 				arcangle = 360-arcangle
-		traveldist = angle_to_arclength(rad,arcangle)	
+				
+		traveldist = angle_to_arclength(rad,abs(arcangle))	
 		# If that length is more than allowed, update target point
 		if traveldist > builtins.maxdrivedist:
 			maxdriveangle = arclength_to_angle(rad,builtins.maxdrivedist)
@@ -381,7 +444,7 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 			final_vec = R.from_euler('z', -c_ccw, degrees=True).apply(final_vec)
 			final_vec=final_vec[:2]
 			final_angle = -anglebetween([1,0],final_vec)
-	
+
 		# If plot=True, draw this path
 		color='magenta'
 		if flip:
@@ -394,8 +457,8 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 				arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle2, theta1=0, theta2=angle3,edgecolor=color,linestyle='--')
 
 			ax.add_patch(arc)
-			draw_bicycle(bikeorigin,theta,steerangle,color='blue')
-			#draw_bicycle(goal_point,final_angle,0,color='blue')			
+			draw_bicycle(bikeorigin,theta,steerangle,color='cyan')
+			draw_bicycle(goal_point,final_angle,0,color='blue')			
 
 		# Return the final bike state and useful info relating to u, the controls
 		return (goal_point,final_angle),(steerangle,intersection,rad)
