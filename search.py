@@ -91,6 +91,50 @@ def plotLineHigh(x0,y0,x1,y1):
 		D = D + 2*deltax
 	return pixels
 
+def getCirclePoints(xc,yc,p,q):
+	pixels=[]
+	for value1  in [-p,p,-q,q]:
+		for value2 in [-p,p,-q,q]:
+			if abs(value1)==abs(value2):
+				continue
+			pixel = (xc+value1,yc+value2)
+			if valid(pixel):
+				pixels.append(pixel)
+	return pixels
+
+def getCircle(xc,yc,r,draw=False):
+	x = r
+	y = 0
+	d = 1 - r
+	pixels = []
+	while x>y:
+		pixels = pixels+getCirclePoints(xc, yc, x, y)
+		y = y + 1
+		if d < 0:
+			d = d + 2*y + 1
+		else:
+			x = x - 1
+			d = d + 2*(y-x) + 1
+	
+	test = (xc+int(round(r*0.5*math.sqrt(2))),yc+int(round(r*0.5*math.sqrt(2))))
+	testlist = [(test[0]+1,test[1]),(test[0]-1,test[1]),(test[0],test[1]+1),(test[0],test[1]-1)]
+	drawmore=True
+	for item in testlist:
+		if item in pixels:
+			drawmore=False
+	if drawmore:
+		additional = []
+		additional.append((xc+round(r*0.5*math.sqrt(2)),yc+round(r*0.5*math.sqrt(2))))
+		additional.append((xc-round(r*0.5*math.sqrt(2)),yc-round(r*0.5*math.sqrt(2))))
+		additional.append((xc+round(r*0.5*math.sqrt(2)),yc-round(r*0.5*math.sqrt(2))))
+		additional.append((xc-round(r*0.5*math.sqrt(2)),yc+round(r*0.5*math.sqrt(2))))
+		for item in additional:
+			if valid(item):
+				pixels.append(item)
+	if draw:
+		for item in pixels:
+			builtins.imarray[item[0],item[1]]=0
+
 def getneighbors(node):
 	listofneighbors = []
 	# Get the neighbors of the node

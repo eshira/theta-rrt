@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import builtins
 import search
 import rrt
+import math
 
 """
 PARAMETERS
@@ -31,14 +32,13 @@ builtins.anglestdv = 100 # Stddev for normal dist of angle in rand_conf()
 
 # Main
 if __name__ == "__main__":
-    # Set up image and plotting stuff
+	# Set up image and plotting stuff
 	if len(sys.argv)>1:
 		img = Image.open(sys.argv[1]).convert('1')
 	else:
 		img = Image.open('blank.png').convert('1')
 	
 	builtins.imarray = np.array(img)
-	imgplot = plt.imshow(img)
 	plt.grid(True)
 	builtins.ax = plt.gca()
 
@@ -50,6 +50,7 @@ if __name__ == "__main__":
 	search.drawpath(mainpath)
 	"""
 	
+	"""
 	# Run an RRT
 	begin = ((30,20),rrt.standardangle(90))
 	end = ((30,25),rrt.standardangle(0))
@@ -75,6 +76,8 @@ if __name__ == "__main__":
 	#begin = ((103,45),rrt.standardangle(-80))
 	#end = ((103,48),rrt.standardangle(-90))
 	#rrt.steer(begin[0],begin[1],end[0],end[1],plot=True)
-
+	"""
+	search.getCircle(0,0,100,draw=True)
 	# Finally show the plot
+	imgplot = plt.imshow(builtins.imarray,cmap='gray', vmin=0, vmax=1)
 	plt.show()
