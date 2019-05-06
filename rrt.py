@@ -97,6 +97,28 @@ def drawtree(begin,graph,camefrom):
 			draw_path_segment(parent,child,u,colors={"left":"lightgray","right":"silver","straight":"silver","bike":"darkgray"},bikes=False)
 		if not graph[parent]:
 			draw_bicycle(parent[0],parent[1],0,color='darkgray')
+
+def anglediff(angle1,angle2):
+	# Compute angle difference between goal and qnew
+	r1 = R.from_euler('z', angle1, degrees=True)
+	r2 = R.from_euler('z', angle2, degrees=True)
+	diff = r1.inv()*r2
+	diff = diff.as_euler('xyz')[2]
+	diff = abs(np.rad2deg(diff))
+	return diff
+
+def findnearest(tree,goal):
+	# find nearest on graph to solution? pick that???
+	nearest = (None,None)
+	for parent in tree.keys():
+		for child in tree[parent]:
+			distance = builtins.weightxy*search.L2norm(child[0],goal[0]) + (1-builtins.weightxy)*anglediff(child[1],goal[1])
+			if nearest==(None,None):				
+				nearest = (child,distance)
+			else:
+				if distance < nearest[1]: # Distance from child to parent
+					nearest = (child,distance)
+	return nearest
 	
 def rrt(start,goal):
 	# Set up start, goal, tree, and parent map
@@ -174,7 +196,7 @@ def rrt(start,goal):
 
 	return sol,G,cameFrom
 
-def draw_path_segment(bike1,bike2,u,colors={"left":"magenta","right":"dodgerblue","straight":"red","bike":"blue"},bikes=True):
+def draw_path_segment(bike1,bike2,u,colors={"left":"magenta","right":"dodgerblue","straight":"red","bike":"dodgerblue"},bikes=True):
 	""" Draw the path segment passed in to this function
 		Useful so that we can only visualize non-culled candidates in rrt()
 	"""

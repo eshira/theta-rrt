@@ -20,7 +20,7 @@ builtins.LEFTCONSTRAINT = -45
 builtins.RIGHTCONSTRAINT = 45
 
 # RRT parameters
-builtins.K=100 # Number of vertices in the tree
+builtins.K=500 # Number of vertices in the tree
 builtins.showtree = False
 builtins.maxdrivedist = 10 # Max steering arclength/straight line distance to drive
 builtins.tol_xy = 5 # tolerance for goal xy
@@ -52,7 +52,7 @@ if __name__ == "__main__":
 	
 	# Run an RRT
 	begin = ((20,20),rrt.standardangle(0))
-	end = ((100,50),rrt.standardangle(90))
+	end = ((100,50),rrt.standardangle(-179))
 
 	solution,graph,camefrom = rrt.rrt( begin , end )
 	if solution is not None:
@@ -60,7 +60,11 @@ if __name__ == "__main__":
 	else:
 		print("Didn't find solution")
 		rrt.drawtree(begin,graph,camefrom)
-
+		
+		# find nearest on graph to solution? pick that???
+		nearest,mindist = rrt.findnearest(graph,end)
+		rrt.draw_bicycle(nearest[0],nearest[1],0,color='blue')
+					
 	rrt.draw_bicycle(begin[0],begin[1],0,color='red')
 	rrt.draw_bicycle(end[0],end[1],0,color='lime')
 
