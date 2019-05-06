@@ -231,9 +231,9 @@ def draw_path_segment(bike1,bike2,u,colors={"left":"magenta","right":"dodgerblue
 			color=colors["right"]
 		
 		if u[0]<0 or flip:
-			arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle, theta1=0, theta2=-angle3,edgecolor=color,linestyle='--')
+			arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle, theta1=0, theta2=-angle3,edgecolor=color,linestyle='--',zorder=10)
 		else:
-			arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle2, theta1=0, theta2=angle3,edgecolor=color,linestyle='--')
+			arc = patches.Arc(intersection, rad*2, rad*2, angle=-angle2, theta1=0, theta2=angle3,edgecolor=color,linestyle='--',zorder=10)
 
 		ax.add_patch(arc)
 	
@@ -458,7 +458,7 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 
 			ax.add_patch(arc)
 			draw_bicycle(bikeorigin,theta,steerangle,color='cyan')
-			draw_bicycle(goal_point,final_angle,0,color='blue')			
+			#draw_bicycle(goal_point,final_angle,0,color='blue')			
 
 		# Return the final bike state and useful info relating to u, the controls
 		return (goal_point,final_angle),(steerangle,intersection,rad)

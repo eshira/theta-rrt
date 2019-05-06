@@ -26,7 +26,7 @@ builtins.maxdrivedist = 10 # Max steering arclength/straight line distance to dr
 builtins.tol_xy = 5 # tolerance for goal xy
 builtins.tol_ang = 15 # tolerance for final angle to goal angle
 builtins.weightxy = .6 # Mix between target xy and angle in steer(). Angle weight is the complement
-builtins.xystdv = 0.03 # Stddev fac (multiply by image dimensions) for normal dist of xy position in rand_conf()
+builtins.xystdv = 0.04 # Stddev fac (multiply by image dimensions) for normal dist of xy position in rand_conf()
 builtins.anglestdv = 100 # Stddev for normal dist of angle in rand_conf()
 
 # Main
@@ -51,8 +51,8 @@ if __name__ == "__main__":
 	"""
 	
 	# Run an RRT
-	begin = ((100,50),rrt.standardangle(-179))
-	end = ((20,20),rrt.standardangle(0))
+	begin = ((30,20),rrt.standardangle(90))
+	end = ((30,25),rrt.standardangle(0))
 	#begin = ((20,20),rrt.standardangle(0))
 	#end = ((100,50),rrt.standardangle(-179))
 
@@ -61,11 +61,13 @@ if __name__ == "__main__":
 		rrt.drawpath(solution,camefrom)
 	else:
 		print("Didn't find solution")
-		rrt.drawtree(begin,graph,camefrom)
+		# The tree is only useful to visualize if small (limit K)
+		#rrt.drawtree(begin,graph,camefrom)
 		
 		# find nearest on graph to solution? pick that???
 		nearest,mindist = rrt.findnearest(graph,end)
-		rrt.draw_bicycle(nearest[0],nearest[1],0,color='blue')
+		rrt.drawpath(nearest,camefrom)
+		rrt.draw_bicycle(nearest[0],nearest[1],0,color='darkgray')
 					
 	rrt.draw_bicycle(begin[0],begin[1],0,color='red')
 	rrt.draw_bicycle(end[0],end[1],0,color='lime')
