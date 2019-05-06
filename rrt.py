@@ -84,6 +84,10 @@ def drawpath(solution, camefrom):
 			if b is None:
 				break
 			draw_path_segment(b,a,u)
+			pixels = search.getArc(b[0],a[0],u)
+			for item in pixels:
+				#builtins.imarray[item[1]][item[0]]=0
+				plt.scatter(item[0],item[1],s=10,color='blue')
 			#steer(b[0],b[1],a[0],a[1],plot=True)
 			a = b # child
 			b,u = camefrom[b] # parent
@@ -120,7 +124,7 @@ def findnearest(tree,goal):
 					nearest = (child,distance)
 	return nearest
 	
-def rrt(start,goal):
+def rrt(start,goal,debug=False):
 	# Set up start, goal, tree, and parent map
 	start = (start[0],standardangle(start[1]))
 	goal = (goal[0],standardangle(goal[1]))
@@ -132,16 +136,17 @@ def rrt(start,goal):
 
 	# Create the RRT
 	for k in range(1,K):
+		if debug: print(k)
 		# Get a randomly sampled point
 		qrand = (rand_conf(goal))
 		qrand = (qrand[0],standardangle(qrand[1]))
 
 		# If qrand falls on an obstacle or is in the set of keys
 		if (not search.freespace(qrand[0])):
-			print('Not freespace')
+			if debug: print('Qrand not in freespace')
 			continue
 		if (qrand in G.keys()):
-			print("In keys")
+			if debug: print("Qrand already in keys")
 			continue
 
 		# Find qnear, the nearest point (by L2norm) in the tree to qrand
@@ -158,13 +163,14 @@ def rrt(start,goal):
 		if (standardangle(u[0])<LEFTCONSTRAINT) or (standardangle(u[0])>RIGHTCONSTRAINT):
 			continue
 		# Reason: Not in the map
-		#if (not valid(qrdive[0]):
-		#	print('invalid')
-		#	continue
+		if (not search.valid(qnew[0])):
+			if debug: print('Qnew out of bounds')
+			continue
 		# Reason: Path runs into obstacles
-		#if not lineofsight(qnew[0],qnear[0]):
-		#	print('notlineofsight')
-		#	continue
+		pixels = search.getArc(qnear[0],qnew[0],u)
+		if False in [search.freespace(px) for px in pixels]:
+			if debug: print('Path to qnew intersects obstacles')
+			continue
 
 		# If qnew fell on an existing node in the tree, must not overwrite it
 		if not (qnew in G.keys()):

@@ -40,8 +40,8 @@ def lineofsight(node1,node2):
 
 def bresenham(node1,node2):
 	#Bresenham's https://en.wikipedia.org/wiki/Bresenham%27s_line_algorithm
-	x0,y0 = node1
-	x1,y1 = node2
+	x0,y0 = int(node1[0]),int(node1[1])
+	x1,y1 = int(node2[0]),int(node2[1])
 	if abs(y1 - y0) < abs(x1 - x0):
 		if x0 > x1:
 			return plotLineLow(x1, y1, x0, y0)
@@ -139,16 +139,15 @@ def getCircle(center,r,draw=False):
 			builtins.imarray[item[1],item[0]]=0
 	return pixels
 
-def getArc(begin,land,u,draw=False):
+def getArc(begin,land,u):
 	if u[1] is None: # you tried to draw an arc for a straight line
-		# To do, return the straight line with the line drawing algo
-		return False
+		return bresenham(begin,land)
 	else:
 		# Get the full circle reprsented by pixels
 		pixels = getCircle(u[1],u[2])
 		# Compute the angles to the beginning and end of the arc
-		beginangle = rrt.anglebetween([1,0],np.subtract(begin[0],u[1]))
-		endangle = rrt.anglebetween([1,0],np.subtract(land[0],u[1]))
+		beginangle = rrt.anglebetween([1,0],np.subtract(begin,u[1]))
+		endangle = rrt.anglebetween([1,0],np.subtract(land,u[1]))
 		if u[0]<0: # left turn case (CCW)
 			diff = rrt.anglediff(beginangle,endangle)
 		else: # right turn case (CW)
@@ -179,7 +178,7 @@ def getArc(begin,land,u,draw=False):
 					include=False
 			if include:
 				remaining.append(item)
-				if draw: builtins.imarray[item[1],item[0]]=0
+		return remaining
 
 def getneighbors(node):
 	listofneighbors = []
