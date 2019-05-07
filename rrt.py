@@ -165,18 +165,10 @@ def rrt(start,goal,debug=False):
 		# Reason: Cannot achieve this steering
 		if (standardangle(u[0])<LEFTCONSTRAINT) or (standardangle(u[0])>RIGHTCONSTRAINT):
 			continue
-		# Reason: Not in the map
-		if (not search.valid(qnew[0])):
-			if debug: print('Qnew out of bounds')
-			continue
-		# Reason: bike intersects obstacles
-		if not bike_clear(qnew):
-			if debug: print('Bike does not clear obstacles')
-			continue
-		# Reason: front of bike too close to obstacles
-		if not front_of_bike_clear(qnew):
-			if debug: print('Front of bike not clear')
-			continue	
+		# Reasons to try driving less far
+		if (not search.valid(qnew[0])) or (not bike_clear(qnew)) or (not front_of_bike_clear(qnew)):
+			u = (u[0],u[1],u[2],u[3]/3) # to do would be decide the right distance
+			qnew,u = drive(qnear, u)
 		# Reason: Path runs into obstacles
 		pixels = search.getArc(qnear[0],qnew[0],u)
 		if False in [search.freespace(px) for px in pixels]:
@@ -228,49 +220,6 @@ def front_of_bike_clear(bike,plot=False):
 	test = search.lineofsight(bike[0],pivot)
 	if test==False: return False
 	return True
-	"""
-	testbike = (bike[0][0]+1,bike[0][1])
-	pivot1 = np.add(bikeframe[:2],testbike)
-	pivot1 = (int(pivot[0]),int(pivot[1]))
-	test = search.lineofsight(testbike,pivot)
-	if test==False: return False
-
-	testbike = (bike[0][0]-1,bike[0][1])
-	pivot1 = np.add(bikeframe[:2],testbike)
-	pivot1 = (int(pivot[0]),int(pivot[1]))
-	test = search.lineofsight(testbike,pivot)
-	if test==False: return False
-
-	testbike = (bike[0][0],bike[0][1]+1)
-	pivot1 = np.add(bikeframe[:2],testbike)
-	pivot1 = (int(pivot[0]),int(pivot[1]))
-	test = search.lineofsight(testbike,pivot)
-	if test==False: return False
-
-	testbike = (bike[0][0],bike[0][1]+1)
-	pivot1 = np.add(bikeframe[:2],testbike)
-	pivot1 = (int(pivot[0]),int(pivot[1]))
-	test = search.lineofsight(testbike,pivot)
-	if test==False: return False
-
-	return True
-	"""
-	#
-
-	#return search.lineofsight(bike[0],pivot)
-	"""
-	result = True
-	bikeframe = [bikelength,0,0]
-	bikeframe = R.from_euler('z', bike[1], degrees=True).apply(bikeframe)
-	pivot = np.add(bikeframe[:2],bike[0])
-	pivot = (int(pivot[0]),int(pivot[1]))
-	check = [(pivot[0]+p[0],pivot[1]+p[1]) for p in itertools.product([-1,0,1],repeat=2)]
-	for item in check:
-		if not search.freespace(item):
-			result = False
-			break
-	return result
-	"""
 
 def draw_path_segment(bike1,bike2,u,colors={"left":"magenta","right":"dodgerblue","straight":"red","bike":"dodgerblue"},bikes=True):
 	""" Draw the path segment passed in to this function
@@ -319,6 +268,40 @@ def draw_path_segment(bike1,bike2,u,colors={"left":"magenta","right":"dodgerblue
 	if bikes:
 		draw_bicycle(bike1[0],bike1[1],u[0],color=colors["bike"])
 		#draw_bicycle(bike2[0],bike2[1],0,color='blue')
+
+def drive(bikeorigin, u):
+	# Return the result of steering u
+	# Convert arclength to angle
+	angle = arclength_to_angle(u[2],u[3])
+	# Find the vector of the bike frame
+	bikeframe = [bikelength,0,0]
+	r_theta = R.from_euler('z', bikeorigin[1], degrees=True)
+	bikeframe = r_theta.apply(bikeframe)
+	bikeframe1 = R.from_euler('z',180,degrees=True).apply(bikeframe)
+
+	bikeoriginvec = [bikeorigin[0][0],bikeorigin[0][1],0]
+	icc = [u[1][0],u[1][1],0]
+	bikeframe = np.add(np.subtract(bikeoriginvec,icc),bikeframe)
+	bikeframe1 = np.add(np.subtract(bikeoriginvec,icc),bikeframe1)
+
+	if u[0]<0: # left turn
+		# Rotate the starting point CCW by angle
+		r = R.from_euler('z',-angle,degrees=True)
+	else:
+		r = R.from_euler('z',angle,degrees=True)
+
+	bikeframe = r.apply(bikeframe)
+	bikeframe1 = r.apply(bikeframe1)
+
+	bikeframe = np.add(icc[:2],bikeframe[:2])
+	bikeframe1 = np.add(icc[:2],bikeframe1[:2])
+
+	finalposition = 0.5*np.add(bikeframe1,bikeframe)
+	bikeframe = np.subtract(bikeframe[:2],finalposition)
+	finalangle = -anglebetween([1,0],bikeframe)
+	# Rotate both vectors yielding the perp bisector and the normal of the bike
+	#draw_bicycle(finalposition,finalangle,0,color='yellow')
+	return ((finalposition[0],finalposition[1]),finalangle),u
 
 def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 	""" Steer the bike towards the bikegoal in a single step attempt
@@ -499,6 +482,7 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 		traveldist = angle_to_arclength(rad,abs(arcangle))	
 		# If that length is more than allowed, update target point
 		if traveldist > builtins.maxdrivedist:
+			traveldist = builtins.maxdrivedist
 			maxdriveangle = arclength_to_angle(rad,builtins.maxdrivedist)
 			if steerangle<0:
 				maxrot = R.from_euler('z',-maxdriveangle,degrees=True)
@@ -537,7 +521,7 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 			draw_bicycle(goal_point,final_angle,0,color='blue')			
 
 		# Return the final bike state and useful info relating to u, the controls
-		return (goal_point,final_angle),(steerangle,intersection,rad)
+		return (goal_point,final_angle),(steerangle,intersection,rad,traveldist)
 
 	except np.linalg.LinAlgError as e: # Singular matrix; straight line driving
 		vector = np.subtract(bikegoal,bikeorigin) # points from bikeorigin to bikegoal
@@ -554,4 +538,4 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 			plt.plot([bikeorigin[0],bikegoal[0]],[bikeorigin[1],bikegoal[1]],linestyle='--',color='pink')
 			draw_bicycle(bikegoal,thetagoal,0,color='blue')
 
-		return (bikegoal,theta),(0, None,None)
+		return (bikegoal,theta),(0, None,None,traveldist)

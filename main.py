@@ -24,7 +24,7 @@ builtins.frontclearance = 2.5 # front clearance multiplier by bike length
 # RRT parameters
 builtins.K=500 # Number of vertices in the tree
 builtins.showtree = False
-builtins.maxdrivedist = 20 # Max steering arclength/straight line distance to drive
+builtins.maxdrivedist = 30 # Max steering arclength/straight line distance to drive
 builtins.tol_xy = 5 # tolerance for goal xy
 builtins.tol_ang = 25 # tolerance for final angle to goal angle
 builtins.weightxy = .6 # Mix between target xy and angle in steer(). Angle weight is the complement
@@ -50,7 +50,6 @@ if __name__ == "__main__":
 	mainpath = search.astar((280,0),(8,280))
 	search.drawpath(mainpath)
 	"""
-	
 	
 	# Run an RRT
 	begin = ((5,20),rrt.standardangle(90))
@@ -78,13 +77,16 @@ if __name__ == "__main__":
 	#bike = ((16,81),rrt.standardangle(45))
 	#rrt.draw_bicycle(bike[0],bike[1],0,color='red')
 	#rrt.front_of_bike_clear(bike,plot=True)
+	
 	"""
-	end = ((15,110),rrt.standardangle(-90))
-	begin = ((30,96),rrt.standardangle(20))
+	end = ((10,110),rrt.standardangle(-90))
+	begin = ((60,110),rrt.standardangle(170))
 	#rrt.draw_bicycle(begin[0],begin[1],0,color='red')
 	rrt.draw_bicycle(end[0],end[1],0,color='lime')
 	landing,u = rrt.steer(begin[0],begin[1],end[0],end[1],plot=True)
-	
+	rrt.drive(begin,u)
+	"""
+	"""
 	goodpath = True
 	color='green'
 	circle = search.getCircle(u[1],u[2])
