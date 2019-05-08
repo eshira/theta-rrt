@@ -538,4 +538,4 @@ def steer(bikeorigin, theta, bikegoal, thetagoal,plot=False):
 			plt.plot([bikeorigin[0],bikegoal[0]],[bikeorigin[1],bikegoal[1]],linestyle='--',color='pink')
 			draw_bicycle(bikegoal,thetagoal,0,color='blue')
 
-		return (bikegoal,theta),(0, None,None,traveldist)
+		return (bikegoal,theta),(0, None,None,1)# to do fix travel dist

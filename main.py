@@ -17,16 +17,16 @@ builtins.THETASTAR = True # True gives Theta* and False gives A*
 # Bike parameters
 builtins.bikelength = 5 # Specify the bike frame length
 builtins.FORWARDONLY = True
-builtins.LEFTCONSTRAINT = -55
-builtins.RIGHTCONSTRAINT = 55
-builtins.frontclearance = 2.5 # front clearance multiplier by bike length
+builtins.LEFTCONSTRAINT = -65
+builtins.RIGHTCONSTRAINT = 65
+builtins.frontclearance = 2 # front clearance multiplier by bike length
 
 # RRT parameters
-builtins.K=500 # Number of vertices in the tree
+builtins.K=300 # Number of vertices in the tree
 builtins.showtree = False
 builtins.maxdrivedist = 30 # Max steering arclength/straight line distance to drive
-builtins.tol_xy = 5 # tolerance for goal xy
-builtins.tol_ang = 25 # tolerance for final angle to goal angle
+builtins.tol_xy = 10 # tolerance for goal xy
+builtins.tol_ang = 45 # tolerance for final angle to goal angle
 builtins.weightxy = .6 # Mix between target xy and angle in steer(). Angle weight is the complement
 builtins.xystdv = 0.4 # Stddev fac (multiply by image dimensions) for normal dist of xy position in rand_conf()
 builtins.anglestdv = 100 # Stddev for normal dist of angle in rand_conf()
@@ -52,26 +52,36 @@ if __name__ == "__main__":
 	"""
 	
 	# Run an RRT
-	begin = ((5,20),rrt.standardangle(90))
-	end = ((129,175),rrt.standardangle(0))
-	#begin = ((20,20),rrt.standardangle(0))
-	#end = ((100,50),rrt.standardangle(-179))
+	#theta* result, saved for later
+	nearest = None
+	path = [(280, 0), (73, 38), (72, 39), (33, 130), (15, 190), (8, 280), None]
+	for first, second,third in zip(path, path[1:],path[2:]):
+		angle1 = rrt.anglebetween([1,0],np.subtract(second,first))
+		if nearest is not None:
+			angle1 = nearest[1]
+			first = nearest[0]
+		if third==None:
+			angle2 = angle1
+		else:
+			angle2 = rrt.anglebetween([1,0],np.subtract(third,second))		
+		begin = (first,rrt.standardangle(angle1))
+		end = (second,rrt.standardangle(angle2))
 
-	solution,graph,camefrom = rrt.rrt( begin , end , debug=True)
-	if solution is not None:
-		rrt.drawpath(solution,camefrom)
-	else:
-		print("Didn't find solution")
-		# The tree is only useful to visualize if small (limit K)
-		#rrt.drawtree(begin,graph,camefrom)
+		solution,graph,camefrom = rrt.rrt( begin , end , debug=True)
+		if solution is not None:
+			rrt.drawpath(solution,camefrom)
+		else:
+			print("Didn't find solution")
+			# The tree is only useful to visualize if small (limit K)
+			#rrt.drawtree(begin,graph,camefrom)
 		
-		# find nearest on graph to solution? pick that???
-		nearest,mindist = rrt.findnearest(graph,end)
-		rrt.drawpath(nearest,camefrom)
-		rrt.draw_bicycle(nearest[0],nearest[1],0,color='darkgray')
+			# find nearest on graph to solution? pick that???
+			nearest,mindist = rrt.findnearest(graph,end)
+			rrt.drawpath(nearest,camefrom)
+			rrt.draw_bicycle(nearest[0],nearest[1],0,color='darkgray')
 					
-	rrt.draw_bicycle(begin[0],begin[1],0,color='red')
-	rrt.draw_bicycle(end[0],end[1],0,color='lime')
+		rrt.draw_bicycle(begin[0],begin[1],0,color='red')
+		rrt.draw_bicycle(end[0],end[1],0,color='lime')
 	
 	
 	#bike = ((16,81),rrt.standardangle(45))
